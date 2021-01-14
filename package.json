@@ -5,6 +5,9 @@
   "main": "server.ts",
   "scripts": {
     "start": "ts-node src/app-scripts/index.ts",
+    "build": "npm run clean && tsc",
+    "clean": "if [ -d ts-built ]; then rm -r ts-built; fi;",
+    "lint": "eslint src/ --ext .ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Gibryon Bhojraj",
