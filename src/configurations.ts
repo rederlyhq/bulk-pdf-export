@@ -135,6 +135,12 @@ const configurations = {
         metaInLogs: readBooleanValue('LOGGING_META_IN_LOGS', false),
         logJson: readBooleanValue('LOGGING_LOG_JSON', isProduction),
     },
+    aws: {
+        bucket: readStringValue('AWS_BUCKET_NAME', 'rederly-exports-dev'),
+        awsAccessKeyId: readStringValue('AWS_ACCESS_KEY', ''),
+        awsSecretKey: readStringValue('AWS_SECRET_KEY', ''),
+        awsRegion: readStringValue('AWS_REGION', 'us-east-2'),
+    },
     loadPromise: new Promise<void>((resolve, reject) => {
         // Avoid cyclic dependency by deferring the logging until after all the imports are done
         setTimeout(() => {

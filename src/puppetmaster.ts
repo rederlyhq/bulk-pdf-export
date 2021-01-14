@@ -2,6 +2,7 @@ import { isNull } from 'lodash';
 import _ = require('lodash');
 import * as puppeteer from 'puppeteer-core';
 import logger from './utilities/logger';
+import S3Helper from './utilities/s3-helper';
 
 /**
  * An important part of the PDF generation is waiting for the HTML page to finish loading all content.
@@ -23,9 +24,9 @@ export default class Server {
 
         const page = await browser.newPage();
         await page.goto(`file:///tmp/${filepath}.html`, {waitUntil: ['load', 'networkidle0']});
-        const pdf = await page.pdf({path: `/tmp/${filepath}.pdf`});
+        const pdf = await page.pdf();
         logger.debug(`Got PDF data of size: ${pdf.length}`);
-        // TODO: Pass buffer to S3
+        S3Helper.writeFile(filepath, pdf);
         await page.close();
     }
 }

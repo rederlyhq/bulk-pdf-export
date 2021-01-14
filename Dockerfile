@@ -25,6 +25,7 @@ WORKDIR /app
 ENV PATH /app/node_modules/.bin:$PATH
 
 COPY *.json ./
+COPY .env ./
 COPY ./src ./src
 
 RUN npm install --silent && npm run build && groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
