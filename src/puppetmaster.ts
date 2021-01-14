@@ -1,6 +1,6 @@
 import { isNull } from 'lodash';
 import _ = require('lodash');
-import * as puppeteer from 'puppeteer';
+import * as puppeteer from 'puppeteer-core';
 import logger from './utilities/logger';
 
 /**
@@ -9,14 +9,13 @@ import logger from './utilities/logger';
  */
 
 export default class Server {
-    static browser: Promise<puppeteer.Browser> = puppeteer.launch();
+    static browser: Promise<puppeteer.Browser> = puppeteer.launch({executablePath: 'google-chrome-stable'});
 
     constructor() {
         if (!Server.browser) {
-            Server.browser = puppeteer.launch();
+            Server.browser = puppeteer.launch({executablePath: 'google-chrome-stable'});
         }
     }
-    
     
     static async print(filepath: string) {
         const browser = await Server.browser;
