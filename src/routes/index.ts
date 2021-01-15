@@ -11,6 +11,17 @@ import { truncate } from 'lodash';
 
 const writeFile = util.promisify(fs.writeFile);
 
+interface RequestOptions {
+    firstName: string;
+    lastName: string;
+    topicTitle: string;
+    professorUUID: String;
+    problems: {
+        number: number, 
+        srcdoc: string
+    }[]
+};
+
 /**
  * firstName
  * lastName
@@ -18,22 +29,22 @@ const writeFile = util.promisify(fs.writeFile);
  * problems: [{number, srcdoc, attachments}]
  */
 router.post('/', async (_req, _res, next) => {
-    const {firstName, lastName, topicTitle, problems} = _req.body as {firstName: String, lastName: String, topicTitle: String, problems: {number: number, srcdoc: string}[]};
+    const {firstName, lastName, topicTitle, problems} = _req.body as RequestOptions;
     const filename = `${topicTitle}_${lastName}_${firstName}`;
     
-    // problems.forEach(x => console.log(x.srcdoc));
-
-    const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true, debug: true });
+    // Filename is required for caching to work. You must turn this off in development or restart your dev server.
+    const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true });
 
     await writeFile(`/tmp/${filename}.html`, f({
         firstName, lastName, topicTitle, problems
     }), 'utf8');
 
-    console.log(`Wrote /tmp/${filename}.html`);
+    logger.info(`Wrote '/tmp/${filename}.html'`);
 
-    // await Server.print(filename);
+    const awsRes = await Server.print(filename);
+    console.log(awsRes);
 
-    next(httpResponse.Ok('Test', {}));
+    next(httpResponse.Ok(filename, {}));
 });
 
 

@@ -97,6 +97,8 @@ app.use((req, res, next) => {
 
 app.use(bodyParser.json());
 
+app.use(express.static('/tmp'))
+
 app.use(server.basePath, router);
 
 // General Handler

@@ -11,10 +11,11 @@ export default class S3Helper {
         }
     });
 
-    static async writeFile(filename: string, body: Buffer) {
-        const data = await S3Helper.s3.send(new PutObjectCommand({
+    // AWS filenames are full "logical paths" from the bucket.
+    static async writeFile(awsFilename: string, body: Buffer) {
+        return await S3Helper.s3.send(new PutObjectCommand({
             Bucket: configurations.aws.bucket,
-            Key: `${filename}.pdf`,
+            Key: `${awsFilename}.pdf`,
             Body: body,
         }));
     }
