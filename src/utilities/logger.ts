@@ -40,20 +40,6 @@ if (!_.isNil(loggingLevelForConsole)) {
   );
 }
 
-if (!_.isNil(loggingLevelForFile)) {
-  transports.push(
-    new winston.transports.File({
-      level: loggingLevelForFile.key,
-      filename: './logs/all-logs.log',
-      handleExceptions: true,
-      // json:             true,
-      maxsize: 5242880, //5MB
-      maxFiles: 5,
-      // colorize:         false
-    })
-  );
-}
-
 // If the logger has no tranpsort it logs the following message to console (with the log content)
 // [winston] Attempt to write logs with no transports ${LOG_OBJECT}
 const logger = winston.createLogger({

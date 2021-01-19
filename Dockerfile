@@ -37,4 +37,4 @@ RUN npm install --silent && npm run build && groupadd -r pptruser && useradd -r 
 USER pptruser
 
 EXPOSE 3005
-CMD ["node", "ts-built/app-scripts/index.js"]
+CMD ["node", "--trace-warnings", "ts-built/app-scripts/index.js"]

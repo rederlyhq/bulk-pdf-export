@@ -1,0 +1,10 @@
+{
+    "configurations": [
+        {
+            "name": "Attach to backend server",
+            "type": "node",
+            "request": "attach",
+            "port": 5858
+          }
+    ]
+}
