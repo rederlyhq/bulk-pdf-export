@@ -5,8 +5,8 @@
   "main": "server.ts",
   "scripts": {
     "start": "ts-node src/app-scripts/index.ts",
-    "start:debug": "node --inspect=5858 -r ts-node/register src/app-scripts/index.ts",
-    "start:debug:watch": "nodemon --inspect=5858 src/app-scripts/index.ts",
+    "start:debug": "node --inspect=5857 -r ts-node/register src/app-scripts/index.ts",
+    "start:debug:watch": "nodemon --inspect=5857 src/app-scripts/index.ts",
     "start:docker": "docker run --cap-add=SYS_ADMIN -p 3005:3005 --rm -it $(docker build -q .)",
     "build": "npm run clean && tsc",
     "clean": "if [ -d ts-built ]; then rm -r ts-built; fi;",
@@ -15,6 +15,20 @@
   },
   "author": "Gibryon Bhojraj",
   "license": "GPL-3.0",
+  "nodemonConfig": {
+    "ignore": [
+      "**/*.test.ts",
+      "**/*.spec.ts"
+    ],
+    "watch": [
+      "src"
+    ],
+    "ext": "ts",
+    "execMap": {
+      "ts": "node --require ts-node/register"
+    },
+    "signal": "SIGINT"
+  },
   "dependencies": {
     "@aws-sdk/client-s3": "3.2.0",
     "@aws-sdk/lib-storage": "3.2.0",
@@ -24,6 +38,7 @@
     "dotenv-expand": "^5.1.0",
     "express": "^4.17.1",
     "html5-to-pdf": "^4.0.1",
+    "http-proxy-middleware": "^1.0.6",
     "lodash": "^4.17.20",
     "morgan": "^1.10.0",
     "pug": "^3.0.0",

@@ -51,15 +51,15 @@ router.post('/', async (_req, _res, next) => {
 
     logger.info(`Wrote '/tmp/${filename}.html'`);
 
-    // const buffer = await PuppetMaster.print(filename);
+    const buffer = await PuppetMaster.print(filename);
     
-    // if (_.isNil(buffer) || _.isEmpty(buffer)) {
-    //     logger.error(`Failed to print ${filename}`);
-    //     return next(Boom.badImplementation('Failed to print.'));
-    // }
+    if (_.isNil(buffer) || _.isEmpty(buffer)) {
+        logger.error(`Failed to print ${filename}`);
+        return next(Boom.badImplementation('Failed to print.'));
+    }
 
-    // logger.debug(`Got PDF data of size: ${buffer.length}`);
-    // S3Helper.writeFile(`${prefix}${filename}`, buffer);
+    logger.debug(`Got PDF data of size: ${buffer.length}`);
+    S3Helper.writeFile(`${prefix}${filename}`, buffer);
 
     next(httpResponse.Ok(filename, {}));
 });
