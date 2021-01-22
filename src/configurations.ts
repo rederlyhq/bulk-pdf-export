@@ -141,6 +141,9 @@ const configurations = {
         awsSecretKey: readStringValue('AWS_SECRET_KEY', ''),
         awsRegion: readStringValue('AWS_REGION', 'us-east-2'),
     },
+    renderer: {
+        url: readStringValue('RENDERER_URL'),
+    },
     loadPromise: new Promise<void>((resolve, reject) => {
         // Avoid cyclic dependency by deferring the logging until after all the imports are done
         setTimeout(() => {

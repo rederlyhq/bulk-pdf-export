@@ -2,11 +2,11 @@
 
 import * as express from 'express';
 import { Request, Response, NextFunction } from 'express';
-import * as bodyParser  from 'body-parser';
 import * as nodeUrl from 'url';
 import * as Boom from 'boom';
 import * as morgan from 'morgan';
 import * as _ from 'lodash';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 import logger from './utilities/logger';
 import configurations from './configurations';
@@ -16,6 +16,14 @@ import './utilities/array-extension';
 const { server } = configurations;
 
 const app = express();
+
+const apiProxy = createProxyMiddleware('/webwork2_files/**', {
+    target: configurations.renderer.url ?? undefined,
+    changeOrigin: true,
+    logLevel: 'debug',
+    // onError: console.log,
+    // onProxyReq: console.log
+});
 
 interface ErrorResponse {
     statusCode: number;
@@ -59,23 +67,23 @@ const generatePathRegex = (pathRegex: string): RegExp => new RegExp(`^${server.b
 const baseUrlRegex = generatePathRegex('.*');
 
 // If these configurations aren't used there is no need to bog down the middlewares
-if (server.logInvalidlyPrefixedRequests || server.blockInvalidlyPrefixedRequests) {
-    app.use((req: Request, _res: Response, next: NextFunction) => {
-        const { path: reqPath } = req;
+// if (server.logInvalidlyPrefixedRequests || server.blockInvalidlyPrefixedRequests) {
+//     app.use((req: Request, _res: Response, next: NextFunction) => {
+//         const { path: reqPath } = req;
         
-        const isInvalid = baseUrlRegex.test(reqPath) === false;
+//         const isInvalid = baseUrlRegex.test(reqPath) === false;
 
-        if (server.logInvalidlyPrefixedRequests && isInvalid) {
-            logger.warn(`A request came in that did not match the baseURL; This could be sign of an intrusion attempt! ${reqPath}`);
-        }
+//         if (server.logInvalidlyPrefixedRequests && isInvalid) {
+//             // logger.warn(`A request came in that did not match the baseURL; This could be sign of an intrusion attempt! ${reqPath}`);
+//         }
     
-        if (server.blockInvalidlyPrefixedRequests && isInvalid) {
-            req.socket.end();
-        } else {
-            next();
-        }
-    });
-}
+//         if (server.blockInvalidlyPrefixedRequests && isInvalid) {
+//             req.socket.end();
+//         } else {
+//             next();
+//         }
+//     });
+// }
 
 const apiTimeout = server.requestTimeout;
 app.use((req, res, next) => {
@@ -96,9 +104,13 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(bodyParser.json());
+app.use(apiProxy);
 
-app.use(express.static('/tmp'))
+app.use(express.urlencoded());
+
+app.use(express.json());
+
+app.use('/export', express.static('/tmp'))
 
 app.use(server.basePath, router);
 
