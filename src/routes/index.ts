@@ -40,7 +40,7 @@ interface RequestOptions {
 router.post('/', async (_req, _res, next) => {
     const {firstName, lastName, topic: {name, id}, problems, professorUUID} = _req.body as RequestOptions;
     const filename = `${name}_${lastName}_${firstName}`;
-    const prefix = `${professorUUID}/${id}/`;
+    const prefix =  `${professorUUID}/${id}/`;
     
     // Filename is required for caching to work. You must turn this off in development or restart your dev server.
     const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true });
@@ -74,7 +74,7 @@ router.get('/', async (_req, _res, next) => {
     const prefix = `${profUUID}/${topicId}`;
     logger.debug(`Getting objects fromm ${prefix}`);
 
-    const res = await S3Helper.getFilesInFolder(prefix);
+    const res = await S3Helper.getFilesInFolder(`${prefix}/`);
     if (_.isNil(res.Contents) || _.isEmpty(res.Contents)) {
         return next(Boom.preconditionFailed('No files to archive.'));
     }

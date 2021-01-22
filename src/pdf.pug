@@ -6,7 +6,7 @@ body(width="210mm" height="297mm")
     h3 #{firstName}, #{lastName}, #{topicTitle}
     each problem in problems
         if problem.srcdoc
-            h3 Problem #{problem.number}
+            h3(style={'page-break-before': 'always'}) Problem #{problem.number}
             iframe(srcdoc=`${problem.srcdoc.trim()}` width='100%' id=`prob${problem.number}`)
             script.
                 // checkOrigin is just for development.
