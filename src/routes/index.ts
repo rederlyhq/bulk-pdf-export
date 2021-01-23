@@ -41,17 +41,22 @@ router.post('/', async (_req, _res, next) => {
     const {firstName, lastName, topic: {name, id}, problems, professorUUID} = _req.body as RequestOptions;
     const filename = `${name}_${lastName}_${firstName}`;
     const prefix =  `${professorUUID}/${id}/`;
+    const htmlFilename = `/tmp/${filename}.html`;
     
     // Filename is required for caching to work. You must turn this off in development or restart your dev server.
     const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true });
 
-    await writeFile(`/tmp/${filename}.html`, f({
+    await writeFile(htmlFilename, f({
         firstName, lastName, name, problems
     }), 'utf8');
 
-    logger.info(`Wrote '/tmp/${filename}.html'`);
+    logger.info(`Wrote '${htmlFilename}'`);
 
     const buffer = await PuppetMaster.print(filename);
+
+    fs.unlink(htmlFilename, () => {
+        logger.info(`Cleaned up '${htmlFilename}'`);
+    });
     
     if (_.isNil(buffer) || _.isEmpty(buffer)) {
         logger.error(`Failed to print ${filename}`);
@@ -59,7 +64,7 @@ router.post('/', async (_req, _res, next) => {
     }
 
     logger.debug(`Got PDF data of size: ${buffer.length}`);
-    S3Helper.writeFile(`${prefix}${filename}`, buffer);
+    await S3Helper.writeFile(`${prefix}${filename}`, buffer);
 
     next(httpResponse.Ok(filename, {}));
 });
