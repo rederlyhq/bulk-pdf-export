@@ -26,8 +26,8 @@ interface RequestOptions {
     }
     professorUUID: String;
     problems: {
-        number: number, 
-        srcdoc: string
+        number: number;
+        srcdoc: string;
     }[]
 };
 
@@ -47,7 +47,7 @@ router.post('/', async (_req, _res, next) => {
     const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true });
 
     await writeFile(htmlFilename, f({
-        firstName, lastName, name, problems
+        firstName, lastName, topicTitle: name, problems
     }), 'utf8');
 
     logger.info(`Wrote '${htmlFilename}'`);
@@ -64,7 +64,7 @@ router.post('/', async (_req, _res, next) => {
     }
 
     logger.debug(`Got PDF data of size: ${buffer.length}`);
-    await S3Helper.writeFile(`${prefix}${filename}`, buffer);
+    // await S3Helper.writeFile(`${prefix}${filename}`, buffer);
 
     next(httpResponse.Ok(filename, {}));
 });
@@ -141,7 +141,6 @@ router.get('/', async (_req, _res, next) => {
         console.error(e);
         next(Boom.badRequest('Failed to upload zip.', e));
     }
-
 });
 
 export default router;

@@ -7,7 +7,7 @@
     "start": "ts-node src/app-scripts/index.ts",
     "start:debug": "node --inspect=5857 -r ts-node/register src/app-scripts/index.ts",
     "start:debug:watch": "nodemon --inspect=5857 src/app-scripts/index.ts",
-    "start:docker": "docker run --cap-add=SYS_ADMIN -p 3005:3005 --rm -it $(docker build -q .)",
+    "start:docker": "docker run --add-host host.docker.internal:host-gateway --cap-add=SYS_ADMIN -p 3005:3005 --rm -it $(docker build -q .)",
     "build": "npm run clean && tsc",
     "clean": "if [ -d ts-built ]; then rm -r ts-built; fi;",
     "lint": "eslint src/ --ext .ts",
