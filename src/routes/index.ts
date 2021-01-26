@@ -23,12 +23,13 @@ interface RequestOptions {
     topic: {
         name: string;
         id: number;
-    }
-    professorUUID: String;
+    };
+    professorUUID: string;
     problems: {
         number: number;
         srcdoc: string;
-    }[]
+    }[];
+    attachments: string[];
 };
 
 /**
@@ -39,8 +40,9 @@ interface RequestOptions {
  */
 router.post('/', async (_req, _res, next) => {
     const {firstName, lastName, topic: {name, id}, problems, professorUUID} = _req.body as RequestOptions;
+    logger.info(`Got request to export ${firstName}'s topic with ${problems.length} problems.`);
     const filename = `${name}_${lastName}_${firstName}`;
-    const prefix =  `${professorUUID}/${id}/`;
+    const prefix =  `exports/${professorUUID}/${id}/`;
     const htmlFilename = `/tmp/${filename}.html`;
     
     // Filename is required for caching to work. You must turn this off in development or restart your dev server.
@@ -64,7 +66,7 @@ router.post('/', async (_req, _res, next) => {
     }
 
     logger.debug(`Got PDF data of size: ${buffer.length}`);
-    // await S3Helper.writeFile(`${prefix}${filename}`, buffer);
+    await S3Helper.writeFile(`${prefix}${filename}`, buffer);
 
     next(httpResponse.Ok(filename, {}));
 });
@@ -76,7 +78,8 @@ type GetExportArchiveOptions = {
 
 router.get('/', async (_req, _res, next) => {
     const {profUUID, topicId} = _req.query;
-    const prefix = `${profUUID}/${topicId}`;
+    // The `exports` logical folder in S3 is what our frontend can redirect to.
+    const prefix = `exports/${profUUID}/${topicId}`;
     logger.debug(`Getting objects fromm ${prefix}`);
 
     const res = await S3Helper.getFilesInFolder(`${prefix}/`);

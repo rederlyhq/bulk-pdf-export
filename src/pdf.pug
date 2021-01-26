@@ -14,3 +14,6 @@ body(width="210mm" height="297mm")
                 iFrameResize({ log: true, checkOrigin: false, autoResize: true, resizeFrom: 'child' }, "#prob#{problem.number}");
         else
             h3 Could not render Problem #{problem.number}
+
+        each attachment in (problem.attachments || [])
+            iframe(src=`${attachment}` width='100%')

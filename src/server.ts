@@ -20,7 +20,7 @@ const app = express();
 const apiProxy = createProxyMiddleware('/webwork2_files/**', {
     target: configurations.renderer.url ?? undefined,
     changeOrigin: true,
-    logLevel: 'debug',
+    // logLevel: 'debug',
     // onError: console.log,
     // onProxyReq: console.log
 });
