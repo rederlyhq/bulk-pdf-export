@@ -36,8 +36,12 @@ export default class S3Helper {
                 Bucket: configurations.aws.bucket,
                 Key: awsFilename,
                 Body: pass,
-            }
+            },
+            queueSize: 1000,
+            partSize: 52428800
         })
+
+        upload.on('httpUploadProgress', (progress) => console.log('Aws upload progress', progress));
       
         return {stream: pass, upload: upload};
       }

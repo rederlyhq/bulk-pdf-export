@@ -14,6 +14,7 @@ import * as archiver from 'archiver';
 import { Readable } from 'stream';
 import path = require('path');
 import { ReplicationRuleAndOperator, _Object } from '@aws-sdk/client-s3';
+import axios from 'axios';
 
 const writeFile = util.promisify(fs.writeFile);
 
@@ -56,9 +57,9 @@ router.post('/', async (_req, _res, next) => {
 
     const buffer = await PuppetMaster.print(filename);
 
-    fs.unlink(htmlFilename, () => {
-        logger.info(`Cleaned up '${htmlFilename}'`);
-    });
+    // fs.unlink(htmlFilename, () => {
+    //     logger.info(`Cleaned up '${htmlFilename}'`);
+    // });
     
     if (_.isNil(buffer) || _.isEmpty(buffer)) {
         logger.error(`Failed to print ${filename}`);
@@ -77,10 +78,12 @@ type GetExportArchiveOptions = {
 }
 
 router.get('/', async (_req, _res, next) => {
+    logger.info('Responding with OK first.');
+    next(httpResponse.Ok('Ok'));
     const {profUUID, topicId} = _req.query;
     // The `exports` logical folder in S3 is what our frontend can redirect to.
     const prefix = `exports/${profUUID}/${topicId}`;
-    logger.debug(`Getting objects fromm ${prefix}`);
+    logger.debug(`Getting objects from ${prefix}`);
 
     const res = await S3Helper.getFilesInFolder(`${prefix}/`);
     if (_.isNil(res.Contents) || _.isEmpty(res.Contents)) {
@@ -94,13 +97,20 @@ router.get('/', async (_req, _res, next) => {
     });
 
     // Listen for archiving errors.
-    archive.on('error', logger.error);
+    archive.on('error', error => console.log(error));
+    archive.on('progress', progress => console.log('Got progress object ' + progress.entries.processed));
+    archive.on('warning', warning => console.log(warning));
+    archive.on('entry', entry => console.log('Got an entry'));
+    archive.on('end', () => console.log('End archive'));
+    archive.on('close', () => console.log('Closing archive'));
+    archive.on('drain', () => console.log('Draining archive'));
 
     // Get the stream and upload objects from the AWS SDK.
     const {stream, upload} = S3Helper.uploadFromStream(`${prefix}_file.zip`);
 
     // Pipe the data from the archive to S3.
     archive.pipe(stream);
+
 
     await res.Contents.asyncForEach(async (content) => {
         try {
@@ -132,14 +142,27 @@ router.get('/', async (_req, _res, next) => {
         }
     });
 
-    logger.debug('Finalizing upload as zip.');
+    logger.debug('Uploading... zip.');
 
-    await archive.finalize();
+    try {
+        await archive.finalize();
+        console.log('Done finalizing');
+    } catch (e) {
+        console.log('Error finalizing');
+        console.error(e);
+    }
+
+    logger.debug('Done archiving, now uploading.');
 
     try {
         const uploadRes = await upload.done();
         logger.info(`Uploaded ${prefix}_file.zip`);
-        next(httpResponse.Ok('Ok', {zippedURL: (uploadRes as _Object).Key}));
+
+        const result = await axios.put(`http://host.docker.internal:3001/backend-api/courses/topic/${topicId}/endExport`, {
+            exportUrl: (uploadRes as _Object).Key
+        });
+
+        console.log(result.data);
     } catch (e) {
         console.error(e);
         next(Boom.badRequest('Failed to upload zip.', e));
