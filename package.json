@@ -5,6 +5,7 @@
   "main": "server.ts",
   "scripts": {
     "start": "ts-node src/app-scripts/index.ts",
+    "start:watch": "nodemon src/app-scripts/index.ts",
     "start:debug": "node --inspect=5857 -r ts-node/register src/app-scripts/index.ts",
     "start:debug:watch": "nodemon --inspect=5857 src/app-scripts/index.ts",
     "start:docker": "docker run --add-host host.docker.internal:host-gateway --cap-add=SYS_ADMIN -p 3005:3005 --rm -it $(docker build -q .)",
@@ -30,9 +31,10 @@
     "signal": "SIGINT"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.2.0",
-    "@aws-sdk/lib-storage": "3.2.0",
+    "@aws-sdk/client-s3": "3.3.0",
+    "@aws-sdk/lib-storage": "3.3.0",
     "archiver": "^5.2.0",
+    "aws-sdk": "^2.831.0",
     "axios": "^0.21.1",
     "boom": "^7.3.0",
     "dotenv": "^8.2.0",

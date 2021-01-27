@@ -4,6 +4,7 @@ import stream = require('stream');
 import configurations from '../configurations';
 import logger from './logger';
 import { Upload } from '@aws-sdk/lib-storage';
+import { createReadStream } from 'fs';
 
 export default class S3Helper {
     static awsConfigurationObject = {
@@ -28,22 +29,14 @@ export default class S3Helper {
 
     // This is used to upload a Zip file from a stream.
     static uploadFromStream(awsFilename: string) {
-        var pass = new stream.PassThrough();
-
-        const upload = new Upload({
+        return new Upload({
             client: S3Helper.s3,
             params: {
                 Bucket: configurations.aws.bucket,
                 Key: awsFilename,
-                Body: pass,
+                Body: createReadStream('/tmp/example.zip'),
             },
-            queueSize: 1000,
-            partSize: 52428800
-        })
-
-        upload.on('httpUploadProgress', (progress) => console.log('Aws upload progress', progress));
-      
-        return {stream: pass, upload: upload};
+        }).done();
       }
 
     static async getFilesInFolder(folderPath: string) {

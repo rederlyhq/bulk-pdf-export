@@ -141,6 +141,9 @@ const configurations = {
         awsSecretKey: readStringValue('AWS_SECRET_KEY', ''),
         awsRegion: readStringValue('AWS_REGION', 'us-east-2'),
     },
+    backend: {
+        url: readStringValue('BACKEND_URL'),
+    },
     renderer: {
         url: readStringValue('RENDERER_URL'),
     },

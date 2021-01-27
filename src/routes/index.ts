@@ -15,6 +15,7 @@ import { Readable } from 'stream';
 import path = require('path');
 import { ReplicationRuleAndOperator, _Object } from '@aws-sdk/client-s3';
 import axios from 'axios';
+import configurations from '../configurations';
 
 const writeFile = util.promisify(fs.writeFile);
 
@@ -50,7 +51,7 @@ router.post('/', async (_req, _res, next) => {
     const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true });
 
     await writeFile(htmlFilename, f({
-        firstName, lastName, topicTitle: name, problems
+        firstName, lastName, topicTitle: name, problems: _.sortBy(problems, ['number']),
     }), 'utf8');
 
     logger.info(`Wrote '${htmlFilename}'`);
@@ -105,13 +106,12 @@ router.get('/', async (_req, _res, next) => {
     archive.on('close', () => console.log('Closing archive'));
     archive.on('drain', () => console.log('Draining archive'));
 
-    // Get the stream and upload objects from the AWS SDK.
-    const {stream, upload} = S3Helper.uploadFromStream(`${prefix}_file.zip`);
-
     // Pipe the data from the archive to S3.
-    archive.pipe(stream);
+    const output = fs.createWriteStream('/tmp/example.zip');
+    archive.pipe(output);
+    // archive.pipe(stream);
 
-
+    let len = 0;
     await res.Contents.asyncForEach(async (content) => {
         try {
             const file = await S3Helper.getObject(content);
@@ -120,6 +120,8 @@ router.get('/', async (_req, _res, next) => {
             }
 
             const data = file.Body;
+
+            len += content.Size ?? 0;
 
             if (_.isNil(content.Key)) {
                 logger.error('Tried to zip a file that was unnamed.');
@@ -142,29 +144,28 @@ router.get('/', async (_req, _res, next) => {
         }
     });
 
-    logger.debug('Uploading... zip.');
+    logger.debug(`Attempting to zip up ${len} bytes`);
 
     try {
         await archive.finalize();
-        console.log('Done finalizing');
     } catch (e) {
-        console.log('Error finalizing');
-        console.error(e);
+        logger.error('An error occured finalizing the archive', e);
+        return;
     }
 
     logger.debug('Done archiving, now uploading.');
 
     try {
-        const uploadRes = await upload.done();
+        const uploadRes = await S3Helper.uploadFromStream(`${prefix}_file.zip`);
         logger.info(`Uploaded ${prefix}_file.zip`);
 
-        const result = await axios.put(`http://host.docker.internal:3001/backend-api/courses/topic/${topicId}/endExport`, {
+        const result = await axios.put(`${configurations.backend.url}/backend-api/courses/topic/${topicId}/endExport`, {
             exportUrl: (uploadRes as _Object).Key
         });
 
         console.log(result.data);
     } catch (e) {
-        console.error(e);
+        console.error('Failed to upload to S3 or postback to Backend.', e);
         next(Boom.badRequest('Failed to upload zip.', e));
     }
 });
