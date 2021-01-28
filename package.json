@@ -44,6 +44,7 @@
     "http-proxy-middleware": "^1.0.6",
     "lodash": "^4.17.20",
     "morgan": "^1.10.0",
+    "pdfjs-dist": "^2.6.347",
     "pug": "^3.0.0",
     "puppeteer-core": "^5.5.0",
     "s3-zip": "^3.1.3",

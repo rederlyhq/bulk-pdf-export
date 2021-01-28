@@ -3,19 +3,7 @@ import httpResponse from '../utilities/http-response';
 const router = express.Router();
 import _ = require('lodash');
 import logger from '../utilities/logger';
-import * as pug from 'pug';
-import * as fs from 'fs';
-import * as util from 'util';
-import PuppetMaster from '../puppetmaster';
-import { first, truncate } from 'lodash';
-import S3Helper from '../utilities/s3-helper';
-import Boom = require('boom');
-import * as archiver from 'archiver';
-import { Readable } from 'stream';
-import path = require('path');
-import { ReplicationRuleAndOperator, _Object } from '@aws-sdk/client-s3';
-import axios from 'axios';
-import configurations from '../configurations';
+import { _Object } from '@aws-sdk/client-s3';
 import { createPDFFromSrcdoc, createZipFromPdfs } from './logic';
 
 export interface MakePDFRequestOptions {
@@ -29,13 +17,13 @@ export interface MakePDFRequestOptions {
     problems: {
         number: number;
         srcdoc: string;
-        attachments: string[];
+        attachments: {url: string; name: string}[];
     }[];
 };
 
 // This holds all the promises required to finish before we can zip up the topic.
 const cheatingInMemoryStorage: {
-    [topicId: number]: Promise<void>[]
+    [topicId: number]: Promise<string | undefined>[]
 } = {}
 
 /**
@@ -53,7 +41,7 @@ router.post('/', async (_req, _res, next) => {
         [createPDFFromSrcdoc(body)];
 
     // Respond once the promise to finish is created, then finish.
-    next(httpResponse.Ok('Working on it!', {}));
+    next(httpResponse.Ok('Working on it!'));
 
 });
 
@@ -89,6 +77,8 @@ router.get('/', async (_req, _res, next) => {
     } catch (e) {
         // TODO: Postback error to backend
         logger.error(e);
+    } finally {
+        delete cheatingInMemoryStorage[topicId];
     }
 });
 

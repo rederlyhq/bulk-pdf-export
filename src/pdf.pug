@@ -1,6 +1,61 @@
+mixin PdfSetupMixin
+    script(src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.min.js")
+    script.
+        //- pdfjsLib.GlobalWorkerOptions.workerSrc = 'node_modules/pdfjs-dist/build/pdf.worker.min.js';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.min.js';
+        function renderPage(pdf, pageNumber, canvas) {
+            pdf.getPage(pageNumber).then(
+                function(page) {
+                    console.log(page);
+                    viewport = page.getViewport({scale: 1});
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    page.render({canvasContext: canvas.getContext('2d'), viewport: viewport});
+                }
+            );
+        }
+    style.
+        .pdf-viewer {
+            min-width: 100%;
+            min-height: 100%;
+            background: rgba(0, 0, 0, 0.1);
+            overflow: auto;
+        }
+        .pdf-page-canvas {
+            display: block;
+            margin: 5px auto;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            max-height: 100% !important;
+            max-width: 100% !important;
+        }
+
+
+mixin InlinePdfMixin(url, id)
+    div.pdf-viewer(id=id)
+    script.
+        var thePdf = null;
+        var scale = 1;
+        console.log('Getting ' + "#{url}");
+        pdfjsLib.getDocument("#{url}").promise.then(
+            function(pdf) {
+                console.log(pdf);
+                console.log('Got pdf of ' + pdf.numPages + ' pages');
+
+                viewer = document.getElementById("#{id}");
+                for (page = 1; page <= pdf.numPages; page++) {
+                    canvas = document.createElement("canvas");
+                    canvas.className = 'pdf-page-canvas';
+                    viewer.appendChild(canvas);
+                    renderPage(pdf, page, canvas).promise.then(console.log);
+                }
+            }
+        );
+
+
 doctype html
 head
-  script(src="/webwork2_files/js/vendor/iframe-resizer/js/iframeResizer.min.js")
+    script(src="/webwork2_files/js/vendor/iframe-resizer/js/iframeResizer.min.js")
+    +PdfSetupMixin
 body(width="210mm" height="297mm")
     //- TODO: Add a Rederly header
     h1(style={'text-align': 'center'}) #{topicTitle}
@@ -16,4 +71,7 @@ body(width="210mm" height="297mm")
             h3 Could not render Problem #{problem.number}
 
         each attachment in (problem.attachments || [])
-            img(src=`${attachment}` style={'max-width': '100% !important', 'max-height': '100% !important', 'page-break-inside': 'avoid'})
+            if attachment.name.endsWith('.pdf')
+                +InlinePdfMixin(attachment.url, attachment.name)
+            else
+                img(src=`${attachment.url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'page-break-inside': 'avoid'})

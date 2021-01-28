@@ -29,7 +29,9 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
     const htmlFilename = `/tmp/${filename}.html`;
 
     // Filename is required for caching to work. You must turn this off in development or restart your dev server.
-    const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true });
+    const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: false});
+
+    console.log(_.sortBy(problems, ['number']).map(x => x.number));
 
     await writeFile(htmlFilename, f({
         firstName, lastName, topicTitle: name, problems: _.sortBy(problems, ['number']),
@@ -50,6 +52,8 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
 
     logger.debug(`Got PDF data of size: ${buffer.length}`);
     await S3Helper.writeFile(`${prefix}${filename}`, buffer);
+
+    return htmlFilename;
 }
 
 export const createZipFromPdfs = async (query: GetExportArchiveOptions) => {
@@ -73,7 +77,7 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions) => {
 
     // Listen for archiving errors.
     archive.on('error', error => logger.debug(error));
-    archive.on('progress', progress => logger.debug('Got progress object ' + progress.entries.processed));
+    archive.on('progress', progress => logger.debug(`...${progress.entries.processed}/${progress.entries.total}`));
     archive.on('warning', warning => logger.debug(warning));
     archive.on('end', () => logger.debug('End archive'));
     archive.on('close', () => logger.debug('Closing archive'));

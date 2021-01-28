@@ -30,6 +30,8 @@ export default class PuppetMaster {
         const page = await browser.newPage();
         // The Express server statically hosts the tmp files.
         await page.goto(`http://127.0.0.1:3005/export/${filepathEnc}.html`, {waitUntil: ['load', 'networkidle0'], timeout: 120000});
+        // Wait for 3 seconds after network events are done to give time for any extra renderings.
+        await page.waitForTimeout(3000);
         const pdf = await page.pdf();
         await page.close();
         return pdf;
