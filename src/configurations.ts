@@ -172,7 +172,7 @@ const configurations = {
             }
             // After we log the warnings we can drop the logs, figured it would cause cleanup
             logs = null;
-        });
+        }, 0);
     })
 };
 

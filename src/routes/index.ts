@@ -7,7 +7,7 @@ import * as pug from 'pug';
 import * as fs from 'fs';
 import * as util from 'util';
 import PuppetMaster from '../puppetmaster';
-import { truncate } from 'lodash';
+import { first, truncate } from 'lodash';
 import S3Helper from '../utilities/s3-helper';
 import Boom = require('boom');
 import * as archiver from 'archiver';
@@ -16,10 +16,9 @@ import path = require('path');
 import { ReplicationRuleAndOperator, _Object } from '@aws-sdk/client-s3';
 import axios from 'axios';
 import configurations from '../configurations';
+import { createPDFFromSrcdoc, createZipFromPdfs } from './logic';
 
-const writeFile = util.promisify(fs.writeFile);
-
-interface RequestOptions {
+export interface MakePDFRequestOptions {
     firstName: string;
     lastName: string;
     topic: {
@@ -30,9 +29,14 @@ interface RequestOptions {
     problems: {
         number: number;
         srcdoc: string;
+        attachments: string[];
     }[];
-    attachments: string[];
 };
+
+// This holds all the promises required to finish before we can zip up the topic.
+const cheatingInMemoryStorage: {
+    [topicId: number]: Promise<void>[]
+} = {}
 
 /**
  * firstName
@@ -41,132 +45,50 @@ interface RequestOptions {
  * problems: [{number, srcdoc, attachments}]
  */
 router.post('/', async (_req, _res, next) => {
-    const {firstName, lastName, topic: {name, id}, problems, professorUUID} = _req.body as RequestOptions;
-    logger.info(`Got request to export ${firstName}'s topic with ${problems.length} problems.`);
-    const filename = `${name}_${lastName}_${firstName}`;
-    const prefix =  `exports/${professorUUID}/${id}/`;
-    const htmlFilename = `/tmp/${filename}.html`;
+    const body = _req.body as MakePDFRequestOptions;
+    const topic = body.topic.id;
     
-    // Filename is required for caching to work. You must turn this off in development or restart your dev server.
-    const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true });
+    cheatingInMemoryStorage[topic] = cheatingInMemoryStorage[topic] ? 
+        [...cheatingInMemoryStorage[topic], createPDFFromSrcdoc(body)] : 
+        [createPDFFromSrcdoc(body)];
 
-    await writeFile(htmlFilename, f({
-        firstName, lastName, topicTitle: name, problems: _.sortBy(problems, ['number']),
-    }), 'utf8');
+    // Respond once the promise to finish is created, then finish.
+    next(httpResponse.Ok('Working on it!', {}));
 
-    logger.info(`Wrote '${htmlFilename}'`);
-
-    const buffer = await PuppetMaster.print(filename);
-
-    // fs.unlink(htmlFilename, () => {
-    //     logger.info(`Cleaned up '${htmlFilename}'`);
-    // });
-    
-    if (_.isNil(buffer) || _.isEmpty(buffer)) {
-        logger.error(`Failed to print ${filename}`);
-        return next(Boom.badImplementation('Failed to print.'));
-    }
-
-    logger.debug(`Got PDF data of size: ${buffer.length}`);
-    await S3Helper.writeFile(`${prefix}${filename}`, buffer);
-
-    next(httpResponse.Ok(filename, {}));
 });
 
-type GetExportArchiveOptions = {
+export interface GetExportArchiveOptions {
     profUUID: string;
     topicId: number;
 }
 
 router.get('/', async (_req, _res, next) => {
-    logger.info('Responding with OK first.');
-    next(httpResponse.Ok('Ok'));
-    const {profUUID, topicId} = _req.query;
-    // The `exports` logical folder in S3 is what our frontend can redirect to.
-    const prefix = `exports/${profUUID}/${topicId}`;
-    logger.debug(`Getting objects from ${prefix}`);
+    const {profUUID, topicId: topicIdStr} = _req.query;
 
-    const res = await S3Helper.getFilesInFolder(`${prefix}/`);
-    if (_.isNil(res.Contents) || _.isEmpty(res.Contents)) {
-        return next(Boom.preconditionFailed('No files to archive.'));
-    }
-
-    logger.debug(`Found ${res.Contents.length} files for archiving.`);
-
-    const archive = archiver('zip', {
-        zlib: { level: 9 } // Sets the compression level.
-    });
-
-    // Listen for archiving errors.
-    archive.on('error', error => console.log(error));
-    archive.on('progress', progress => console.log('Got progress object ' + progress.entries.processed));
-    archive.on('warning', warning => console.log(warning));
-    archive.on('entry', entry => console.log('Got an entry'));
-    archive.on('end', () => console.log('End archive'));
-    archive.on('close', () => console.log('Closing archive'));
-    archive.on('drain', () => console.log('Draining archive'));
-
-    // Pipe the data from the archive to S3.
-    const output = fs.createWriteStream('/tmp/example.zip');
-    archive.pipe(output);
-    // archive.pipe(stream);
-
-    let len = 0;
-    await res.Contents.asyncForEach(async (content) => {
-        try {
-            const file = await S3Helper.getObject(content);
-            if (_.isNil(file) || _.isNil(file.Body)) {
-                return null;
-            }
-
-            const data = file.Body;
-
-            len += content.Size ?? 0;
-
-            if (_.isNil(content.Key)) {
-                logger.error('Tried to zip a file that was unnamed.');
-                return;
-            }
-
-            const filename = path.basename(content.Key);
-
-            if (data instanceof Readable) {
-                archive.append(data, {
-                    name: filename,
-                });
-            } else {
-                logger.error('The AWS Library returned a data object that we expected to be Readable, but isn\'t.');
-                return;
-            }
-        } catch (e) {
-            logger.error(e);
-            return;
-        }
-    });
-
-    logger.debug(`Attempting to zip up ${len} bytes`);
-
-    try {
-        await archive.finalize();
-    } catch (e) {
-        logger.error('An error occured finalizing the archive', e);
+    if (_.isNil(topicIdStr) || typeof topicIdStr !== 'string') {
+        logger.error('Bad topic id. ' + topicIdStr);
         return;
     }
 
-    logger.debug('Done archiving, now uploading.');
+    if (typeof profUUID !== 'string') {
+        logger.error('Bad UUID. ' + profUUID);
+        return;
+    }
+
+    const topicId = parseInt(topicIdStr, 10);
+
+    // Respond first to not block. This should happen before any async actions.
+    logger.info('Responding with OK first.');
+    next(httpResponse.Ok('Ok'));
+
+    // Wait for all previous PDF generations for this topic to finish.
+    await Promise.allSettled(cheatingInMemoryStorage[topicId]);
 
     try {
-        const uploadRes = await S3Helper.uploadFromStream(`${prefix}_file.zip`);
-        logger.info(`Uploaded ${prefix}_file.zip`);
-
-        const result = await axios.put(`${configurations.backend.url}/backend-api/courses/topic/${topicId}/endExport`, {
-            exportUrl: (uploadRes as _Object).Key
-        });
-
-        console.log(result.data);
+        await createZipFromPdfs({profUUID, topicId});
     } catch (e) {
-        console.error('Failed to upload to S3 or postback to Backend.', e);
-        next(Boom.badRequest('Failed to upload zip.', e));
+        // TODO: Postback error to backend
+        logger.error(e);
     }
 });
 

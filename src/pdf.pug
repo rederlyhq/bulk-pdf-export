@@ -7,7 +7,7 @@ body(width="210mm" height="297mm")
     h2(style={'text-align': 'center'}) #{firstName} #{lastName}
     each problem in problems
         if problem.srcdoc
-            h3(style={'page-break-before': 'always'}) Problem #{problem.number}
+            h3(style={'page-break-before': 'always', 'page-break-after': 'avoid'}) Problem #{problem.number}
             iframe(srcdoc=`${problem.srcdoc.trim()}` width='100%' id=`prob${problem.number}`)
             script.
                 // checkOrigin is just for development.
@@ -16,4 +16,4 @@ body(width="210mm" height="297mm")
             h3 Could not render Problem #{problem.number}
 
         each attachment in (problem.attachments || [])
-            iframe(src=`${attachment}` width='100%')
+            img(src=`${attachment}` style={'max-width': '100% !important', 'max-height': '100% !important', 'page-break-inside': 'avoid'})
