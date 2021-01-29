@@ -17,7 +17,9 @@ export interface MakePDFRequestOptions {
     problems: {
         number: number;
         srcdoc: string;
-        attachments: {url: string; name: string}[];
+        attachments: {url: string; name: string; time: Date}[];
+        effectiveScore?: number;
+        legalScore?: number;
     }[];
 };
 

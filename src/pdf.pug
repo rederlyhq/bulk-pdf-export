@@ -58,11 +58,19 @@ head
     +PdfSetupMixin
 body(width="210mm" height="297mm")
     //- TODO: Add a Rederly header
+    include templates/rederly-logo.pug
     h1(style={'text-align': 'center'}) #{topicTitle}
     h2(style={'text-align': 'center'}) #{firstName} #{lastName}
     each problem in problems
         if problem.srcdoc
             h3(style={'page-break-before': 'always', 'page-break-after': 'avoid'}) Problem #{problem.number}
+
+        if problem.effectiveScore
+            div Effective Score: #{problem.effectiveScore}%
+        if problem.legalScore
+            div Original System Score: #{problem.legalScore}%
+
+        if problem.srcdoc
             iframe(srcdoc=`${problem.srcdoc.trim()}` width='100%' id=`prob${problem.number}`)
             script.
                 // checkOrigin is just for development.
@@ -71,6 +79,7 @@ body(width="210mm" height="297mm")
             h3 Could not render Problem #{problem.number}
 
         each attachment in (problem.attachments || [])
+            | Uploaded at #{attachment.time}
             if attachment.name.endsWith('.pdf')
                 +InlinePdfMixin(attachment.url, attachment.name)
             else
