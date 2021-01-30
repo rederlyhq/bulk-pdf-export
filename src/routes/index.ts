@@ -4,7 +4,7 @@ const router = express.Router();
 import _ = require('lodash');
 import logger from '../utilities/logger';
 import { _Object } from '@aws-sdk/client-s3';
-import { createPDFFromSrcdoc, createZipFromPdfs } from './logic';
+import { createPDFFromSrcdoc, createZipFromPdfs, postBackErrorOrResultToBackend } from './logic';
 
 export interface MakePDFRequestOptions {
     firstName: string;
@@ -42,9 +42,8 @@ router.post('/', async (_req, _res, next) => {
         [...cheatingInMemoryStorage[topic], createPDFFromSrcdoc(body)] : 
         [createPDFFromSrcdoc(body)];
 
-    // Respond once the promise to finish is created, then finish.
+    // Respond once the promise to finish is created. The work is done asynchronously above.
     next(httpResponse.Ok('Working on it!'));
-
 });
 
 export interface GetExportArchiveOptions {
@@ -77,7 +76,7 @@ router.get('/', async (_req, _res, next) => {
     try {
         await createZipFromPdfs({profUUID, topicId});
     } catch (e) {
-        // TODO: Postback error to backend
+        await postBackErrorOrResultToBackend(topicId);
         logger.error(e);
     } finally {
         delete cheatingInMemoryStorage[topicId];

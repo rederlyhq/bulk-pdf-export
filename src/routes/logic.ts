@@ -14,7 +14,7 @@ import * as archiver from 'archiver';
 import { Readable } from 'stream';
 import path = require('path');
 import { ReplicationRuleAndOperator, _Object } from '@aws-sdk/client-s3';
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import configurations from '../configurations';
 import { GetExportArchiveOptions, MakePDFRequestOptions } from '.';
 
@@ -65,8 +65,7 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions) => {
 
     const res = await S3Helper.getFilesInFolder(`${prefix}/`);
     if (_.isNil(res.Contents) || _.isEmpty(res.Contents)) {
-        // TODO: Postback error
-        return;
+        return await postBackErrorOrResultToBackend(topicId);
     }
 
     logger.debug(`Found ${res.Contents.length} files for archiving.`);
@@ -76,7 +75,7 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions) => {
     });
 
     // Listen for archiving errors.
-    archive.on('error', error => logger.debug(error));
+    archive.on('error', error => {logger.debug(error); postBackErrorOrResultToBackend(topicId);});
     archive.on('progress', progress => logger.debug(`...${progress.entries.processed}/${progress.entries.total}`));
     archive.on('warning', warning => logger.debug(warning));
     archive.on('end', () => logger.debug('End archive'));
@@ -129,8 +128,7 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions) => {
         await archive.finalize();
     } catch (e) {
         logger.error('An error occured finalizing the archive', e);
-        // TODO: Postback error
-        return;
+        return await postBackErrorOrResultToBackend(topicId);
     }
 
     logger.debug('Done archiving, now uploading.');
@@ -139,14 +137,15 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions) => {
         const uploadRes = await S3Helper.uploadFromStream(`${prefix}_file.zip`);
         logger.info(`Uploaded ${prefix}_file.zip`);
 
-        const result = await axios.put(`${configurations.backend.url}/backend-api/courses/topic/${topicId}/endExport`, {
-            exportUrl: (uploadRes as _Object).Key
-        });
-
-        logger.debug(result.data);
+        await postBackErrorOrResultToBackend(topicId, (uploadRes as _Object).Key)
     } catch (e) {
         logger.error('Failed to upload to S3 or postback to Backend.', e);
-        // TODO: Postback error
-        return;
+        await postBackErrorOrResultToBackend(topicId);
     }
+}
+
+export const postBackErrorOrResultToBackend = async (topicId: number, exportUrl?: string): Promise<AxiosResponse> => {
+    return await axios.put(`${configurations.backend.url}/backend-api/courses/topic/${topicId}/endExport`, {
+        exportUrl
+    });
 }
