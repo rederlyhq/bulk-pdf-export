@@ -83,4 +83,22 @@ router.get('/', async (_req, _res, next) => {
     }
 });
 
+process.on('SIGTERM', async () => {
+    logger.warn('Cleaning up by updating backend! If you force kill, the backend will have bad data.');
+    // Cleanup and let the backend know we failed.
+    const proms = _.keys(cheatingInMemoryStorage).map(async (topicId) => {
+        logger.info(`Gracefully posted error for ${topicId}.`);
+        try {
+            await postBackErrorOrResultToBackend(parseInt(topicId, 10));
+        } catch (e) {
+            logger.warn(`Failed to gracefully update Topic ${topicId}`);
+        }
+    });
+
+    await Promise.all(proms);
+
+    logger.info('Gracefully exited due to signal.');
+    process.exit(0);
+})
+
 export default router;
