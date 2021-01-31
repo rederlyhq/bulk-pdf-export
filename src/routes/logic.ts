@@ -132,10 +132,13 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions) => {
     logger.debug('Done archiving, now uploading.');
 
     try {
-        const uploadRes = await S3Helper.uploadFromStream(`${prefix}_file.zip`);
-        logger.info(`Uploaded ${prefix}_file.zip`);
+        const newFilename = `${prefix}_${Date.now()}.zip`;
+        const uploadRes = await S3Helper.uploadFromStream(newFilename);
+        logger.info(`Uploaded ${newFilename}`);
 
         await postBackErrorOrResultToBackend(topicId, (uploadRes as _Object).Key)
+
+        // TODO: Delete old files for the same topic.
     } catch (e) {
         logger.error('Failed to upload to S3 or postback to Backend.', e);
         await postBackErrorOrResultToBackend(topicId);
