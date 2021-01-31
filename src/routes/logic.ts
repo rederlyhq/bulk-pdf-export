@@ -31,15 +31,13 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
     // Filename is required for caching to work. You must turn this off in development or restart your dev server.
     const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: false});
 
-    console.log(_.sortBy(problems, ['number']).map(x => x.number));
-
     await writeFile(htmlFilename, f({
         firstName, lastName, topicTitle: name, problems: _.sortBy(problems, ['number']),
     }), 'utf8');
 
     logger.info(`Wrote '${htmlFilename}'`);
 
-    const buffer = await PuppetMaster.print(filename);
+    const buffer = await PuppetMaster.safePrint(filename);
 
     // fs.unlink(htmlFilename, () => {
     //     logger.info(`Cleaned up '${htmlFilename}'`);
