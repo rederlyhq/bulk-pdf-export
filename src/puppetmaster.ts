@@ -39,8 +39,8 @@ export default class PuppetMaster {
             })
         })
 
-        // Wait for Mathjax to load, timing out after 5 seconds.
-        await Promise.race([mathJaxPromise, page.waitForTimeout(5000)])
+        // Wait for Mathjax to load, timing out after 10 seconds.
+        await Promise.race([mathJaxPromise, page.waitForTimeout(10000)])
 
         // Wait for 3 seconds after network events are done to give time for any extra renderings.
         await page.waitForTimeout(3000);

@@ -29,9 +29,7 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
     const htmlFilename = `/tmp/${filename}.html`;
 
     // Filename is required for caching to work. You must turn this off in development or restart your dev server.
-    const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: false});
-
-    console.log(_.sortBy(problems, ['number']).map(x => x.number));
+    const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true});
 
     await writeFile(htmlFilename, f({
         firstName, lastName, topicTitle: name, problems: _.sortBy(problems, ['number']),
@@ -41,9 +39,9 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
 
     const buffer = await PuppetMaster.print(filename);
 
-    // fs.unlink(htmlFilename, () => {
-    //     logger.info(`Cleaned up '${htmlFilename}'`);
-    // });
+    fs.unlink(htmlFilename, () => {
+        logger.info(`Cleaned up '${htmlFilename}'`);
+    });
     
     if (_.isNil(buffer) || _.isEmpty(buffer)) {
         logger.error(`Failed to print ${filename}`);
