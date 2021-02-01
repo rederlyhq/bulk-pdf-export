@@ -1,4 +1,4 @@
-import { Semaphore } from 'async-mutex';
+import { Semaphore, withTimeout } from 'async-mutex';
 import { isNull } from 'lodash';
 import _ = require('lodash');
 import * as puppeteer from 'puppeteer-core';
@@ -13,7 +13,7 @@ import { performance } from 'perf_hooks';
  */
 
 export default class PuppetMaster {
-    static semaphore = new Semaphore(configurations.app.concurrentPuppeteerTabs);
+    static semaphore = withTimeout(new Semaphore(configurations.app.concurrentPuppeteerTabs), 3600000);
 
     static browser: Promise<puppeteer.Browser> = puppeteer.launch({
         executablePath: 'google-chrome-stable'
@@ -47,6 +47,10 @@ export default class PuppetMaster {
 
         const filepathEnc = encodeURIComponent(filepath);
         const page = await browser.newPage();
+
+        // Open accordions
+        await page.$$eval('canopen', elHandles => elHandles.forEach(el => (el as HTMLElement).click()));
+
         // The Express server statically hosts the tmp files.
         await page.goto(`http://127.0.0.1:${configurations.server.port}/export/${filepathEnc}.html`, {waitUntil: ['load', 'networkidle0'], timeout: 120000});
         const mathJaxPromise = page.evaluate(()=>{
@@ -56,6 +60,11 @@ export default class PuppetMaster {
 
             // @ts-ignore - HTMLCollections are iterable in modern Chrome/Firefox.
             for (let iframe of iframes) {
+                var expandables = iframe.contentDocument.getElementsByClassName('canopen');
+                for (let expandable of expandables) {
+                    expandables.click();
+                }
+
                 mathJaxPromises.push(new Promise<void>((resolveSingleHasLoaded, reject2) => {
                     iframe.contentWindow.MathJax.Hub.Register.StartupHook("End", function () {
                         resolveSingleHasLoaded();
@@ -64,7 +73,7 @@ export default class PuppetMaster {
             }
 
             return Promise.all(mathJaxPromises);
-        })
+        });
 
         // Wait for Mathjax to load, timing out after 10 seconds.
         await Promise.race([mathJaxPromise, page.waitForTimeout(10000)])

@@ -31,6 +31,12 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
     // Filename is required for caching to work. You must turn this off in development or restart your dev server.
     const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true});
 
+    const prettyProblems = _(problems).sortBy(['number']).map(prob => ({
+        ...prob,
+        effectiveScore: prob.effectiveScore?.toPercentString(),
+        legalScore: prob.legalScore?.toPercentString(),
+    }))
+
     await writeFile(htmlFilename, f({
         firstName, lastName, topicTitle: name, problems: _.sortBy(problems, ['number']),
     }), 'utf8');
