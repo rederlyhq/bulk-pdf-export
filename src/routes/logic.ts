@@ -36,7 +36,7 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
         ...prob,
         effectiveScore: prob.effectiveScore?.toPercentString(),
         legalScore: prob.legalScore?.toPercentString(),
-    }))
+    })).value();
 
     await writeFile(htmlFilename, f({
         firstName, lastName, topicTitle: name, problems: prettyProblems,
@@ -108,7 +108,7 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
 
     try {
         const newFilename = `${prefix}_${Date.now()}.zip`;
-        const uploadRes = await S3Helper.uploadFromStream(zipFilename, `${newFilename}.pdf`);
+        const uploadRes = await S3Helper.uploadFromStream(zipFilename, `${newFilename}.zip`);
         logger.info(`Uploaded ${newFilename}`);
 
         await postBackErrorOrResultToBackend(topicId, (uploadRes as _Object).Key)
