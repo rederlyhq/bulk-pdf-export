@@ -14,6 +14,7 @@ import router from './routes';
 import './utilities/array-extension';
 import './utilities/NumberExtensions';
 import './utilities/global-error-handlers';
+import utilities from './routes/utility-route';
 
 const { server } = configurations;
 
@@ -115,6 +116,7 @@ app.use(express.json());
 app.use('/export', express.static('/tmp'))
 
 app.use(server.basePath, router);
+app.use('/utility', utilities);
 
 // General Handler
 // next is a required parameter, without having it requests result in a response of object
