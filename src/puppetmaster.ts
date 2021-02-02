@@ -37,7 +37,7 @@ export default class PuppetMaster {
             throw e;
         } finally {
             release();
-            logger.debug(`Release semaphore, request took ${(performance.now() - perf) * 1000} seconds`);
+            logger.debug(`Release semaphore, request took ${(performance.now() - perf) / 1000} seconds`);
         }
     }
     
@@ -62,10 +62,11 @@ export default class PuppetMaster {
             for (let iframe of iframes) {
                 var expandables = iframe.contentDocument.getElementsByClassName('canopen');
                 for (let expandable of expandables) {
-                    expandables.click();
+                    expandable.click();
                 }
 
                 mathJaxPromises.push(new Promise<void>((resolveSingleHasLoaded, reject2) => {
+                    if (!iframe.contentWindow.MathJax || !iframe.contentWindow.MathJax.Hub) return;
                     iframe.contentWindow.MathJax.Hub.Register.StartupHook("End", function () {
                         resolveSingleHasLoaded();
                     });
@@ -81,6 +82,7 @@ export default class PuppetMaster {
         // Wait for 3 seconds after network events are done to give time for any extra renderings.
         await page.waitForTimeout(3000);
         const pdf = await page.pdf({
+            path: `/tmp/${filepath}.pdf`,
             displayHeaderFooter: true,
             // This currently does not work with our docker build because of https://github.com/puppeteer/puppeteer/issues/5663
             // headerTemplate: '<div style="font-family: Tahoma, Verdana, Segoe, sans-serif; font-size: 6px; padding-left:10px; background-color: red; color:black;"><span class="pageNumber"></span> of <span class="totalPages"></span> Exported by Rederly, Inc.</div>',

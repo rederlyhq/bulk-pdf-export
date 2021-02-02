@@ -70,11 +70,15 @@ router.get('/', async (_req, _res, next) => {
     logger.info('Responding with OK first.');
     next(httpResponse.Ok('Ok'));
 
-    // Wait for all previous PDF generations for this topic to finish.
-    await Promise.allSettled(cheatingInMemoryStorage[topicId]);
+    try {
+        // Wait for all previous PDF generations for this topic to finish.
+        await Promise.allSettled(cheatingInMemoryStorage[topicId]);
+    } catch (e) {
+        logger.error('Zip was requested before any PDFs were!');
+    }
 
     try {
-        await createZipFromPdfs({profUUID, topicId});
+        await createZipFromPdfs({profUUID, topicId}, cheatingInMemoryStorage[topicId]);
     } catch (e) {
         await postBackErrorOrResultToBackend(topicId);
         logger.error(e);

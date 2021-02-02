@@ -27,6 +27,7 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
     const filename = `${name}_${lastName}_${firstName}`;
     const prefix =  `exports/${professorUUID}/${id}/`;
     const htmlFilename = `/tmp/${filename}.html`;
+    const pdfFilename = `/tmp/${filename}.pdf`;
 
     // Filename is required for caching to work. You must turn this off in development or restart your dev server.
     const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true});
@@ -38,7 +39,7 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
     }))
 
     await writeFile(htmlFilename, f({
-        firstName, lastName, topicTitle: name, problems: _.sortBy(problems, ['number']),
+        firstName, lastName, topicTitle: name, problems: prettyProblems,
     }), 'utf8');
 
     logger.info(`Wrote '${htmlFilename}'`);
@@ -57,76 +58,46 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
     logger.debug(`Got PDF data of size: ${buffer.length}`);
     await S3Helper.writeFile(`${prefix}${filename}`, buffer);
 
-    return htmlFilename;
+    return filename;
 }
 
-export const createZipFromPdfs = async (query: GetExportArchiveOptions) => {
+export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromises: Promise<string | undefined>[]) => {
     const {profUUID, topicId} = query;
 
     // The `exports` logical folder in S3 is what our frontend can redirect to.
     const prefix = `exports/${profUUID}/${topicId}`;
-    logger.debug(`Getting objects from ${prefix}`);
-
-    const res = await S3Helper.getFilesInFolder(`${prefix}/`);
-    if (_.isNil(res.Contents) || _.isEmpty(res.Contents)) {
-        return await postBackErrorOrResultToBackend(topicId);
-    }
-
-    logger.debug(`Found ${res.Contents.length} files for archiving.`);
 
     const archive = archiver('zip', {
         zlib: { level: 9 } // Sets the compression level.
     });
 
     // Listen for archiving errors.
-    archive.on('error', error => {logger.debug(error); postBackErrorOrResultToBackend(topicId);});
+    archive.on('error', error => {logger.error('Archiver error' + error); postBackErrorOrResultToBackend(topicId);});
     archive.on('progress', progress => logger.debug(`...${progress.entries.processed}/${progress.entries.total}`));
-    archive.on('warning', warning => logger.debug(warning));
+    archive.on('warning', warning => logger.debug('Archiver warning: ' + warning));
     archive.on('end', () => logger.debug('End archive'));
     archive.on('close', () => logger.debug('Closing archive'));
     archive.on('drain', () => logger.debug('Draining archive'));
 
     // Pipe the data from the archive to S3.
-    const output = fs.createWriteStream('/tmp/example.zip');
+    const zipFilename = `/tmp/${topicId}_${Date.now()}.zip`;
+
+    logger.debug(`Creating /tmp/${topicId}_${Date.now()}.zip`)
+    const output = fs.createWriteStream(zipFilename);
     archive.pipe(output);
     // archive.pipe(stream);
 
-    let len = 0;
-    // TODO: Since we're waiting for each PDF to be created, we could save them to disk and avoid fetching them over
-    // the network.
-    await res.Contents.asyncForEach(async (content) => {
-        try {
-            const file = await S3Helper.getObject(content);
-            if (_.isNil(file) || _.isNil(file.Body)) {
-                return null;
-            }
 
-            const data = file.Body;
-
-            len += content.Size ?? 0;
-
-            if (_.isNil(content.Key)) {
-                logger.error('Tried to zip a file that was unnamed.');
-                return;
-            }
-
-            const filename = path.basename(content.Key);
-
-            if (data instanceof Readable) {
-                archive.append(data, {
-                    name: filename,
-                });
-            } else {
-                logger.error('The AWS Library returned a data object that we expected to be Readable, but isn\'t.');
-                return;
-            }
-        } catch (e) {
-            logger.error(e);
+    await pdfPromises.asyncForEach(async (pdfPromise) => {
+        const pdfFilename = await pdfPromise;
+        if (_.isNil(pdfFilename)) {
+            logger.warn('Got a rejected promise while zipping.');
             return;
         }
-    });
 
-    logger.debug(`Attempting to zip up ${len} bytes`);
+        logger.debug(`Appended /tmp/${pdfFilename}.pdf to zip.`)
+        archive.file(`/tmp/${pdfFilename}.pdf`, { name: pdfFilename });
+    });
 
     try {
         await archive.finalize();
@@ -139,7 +110,7 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions) => {
 
     try {
         const newFilename = `${prefix}_${Date.now()}.zip`;
-        const uploadRes = await S3Helper.uploadFromStream(newFilename);
+        const uploadRes = await S3Helper.uploadFromStream(zipFilename, `${newFilename}.pdf`);
         logger.info(`Uploaded ${newFilename}`);
 
         await postBackErrorOrResultToBackend(topicId, (uploadRes as _Object).Key)
