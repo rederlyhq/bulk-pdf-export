@@ -94,7 +94,7 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
         }
 
         logger.debug(`Appended /tmp/${pdfFilename}.pdf to zip.`)
-        archive.file(`/tmp/${pdfFilename}.pdf`, { name: pdfFilename });
+        archive.file(`/tmp/${pdfFilename}.pdf`, { name: `${pdfFilename}.pdf` });
     });
 
     try {
@@ -108,7 +108,7 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
 
     try {
         const newFilename = `${prefix}_${Date.now()}.zip`;
-        const uploadRes = await S3Helper.uploadFromStream(zipFilename, `${newFilename}.zip`);
+        const uploadRes = await S3Helper.uploadFromStream(zipFilename, newFilename);
         logger.info(`Uploaded ${newFilename}`);
 
         await postBackErrorOrResultToBackend(topicId, (uploadRes as _Object).Key)

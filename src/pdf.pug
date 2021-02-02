@@ -73,8 +73,7 @@ body(width="210mm" height="297mm")
         if problem.srcdoc
             iframe(srcdoc=`${problem.srcdoc.trim()}` width='100%' id=`prob${problem.number}`)
             script.
-                // checkOrigin is just for development.
-                iFrameResize({ log: false, checkOrigin: true, autoResize: true, resizeFrom: 'child' }, "#prob#{problem.number}");
+                iFrameResize({ log: false, checkOrigin: false, autoResize: true, resizeFrom: 'child' }, "#prob#{problem.number}");
         else
             h3 Could not render Problem #{problem.number}
 
