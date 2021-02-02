@@ -12,6 +12,7 @@ import logger from './utilities/logger';
 import configurations from './configurations';
 import router from './routes';
 import './utilities/array-extension';
+import './utilities/NumberExtensions';
 
 const { server } = configurations;
 

@@ -113,6 +113,7 @@ const configurations = {
         isProduction: isProduction,
         logMissingConfigurations: readBooleanValue('LOG_MISSING_CONFIGURATIONS', true),
         failOnMissingConfigurations: readBooleanValue('FAIL_ON_MISSING_CONFIGURATIONS', isProduction),
+        concurrentPuppeteerTabs: readIntValue('CONCURRENT_PUPPETEER_TABS', 5),
     },
     server: {
         port: readStringValue('SERVER_PORT', '3005'),

@@ -28,13 +28,13 @@ export default class S3Helper {
     }
 
     // This is used to upload a Zip file from a stream.
-    static uploadFromStream(awsFilename: string) {
+    static uploadFromStream(localFilename: string, awsFilename: string) {
         return new Upload({
             client: S3Helper.s3,
             params: {
                 Bucket: configurations.aws.bucket,
                 Key: awsFilename,
-                Body: createReadStream('/tmp/example.zip'),
+                Body: createReadStream(localFilename),
             },
         }).done();
       }
