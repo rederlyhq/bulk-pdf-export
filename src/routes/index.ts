@@ -73,7 +73,7 @@ router.get('/', async (_req, _res, next) => {
     const topicId = parseInt(topicIdStr, 10);
 
     // Respond first to not block. This should happen before any async actions.
-    logger.info('Responding with OK first.');
+    logger.info(`Responding to request to zip ${topicId} with OK first.`);
     next(httpResponse.Ok('Ok'));
 
     try {
