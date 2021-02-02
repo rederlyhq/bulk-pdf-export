@@ -49,10 +49,11 @@ router.post('/', async (_req, _res, next) => {
 export interface GetExportArchiveOptions {
     profUUID: string;
     topicId: number;
+    addSolutionToFilename: boolean;
 }
 
 router.get('/', async (_req, _res, next) => {
-    const {profUUID, topicId: topicIdStr} = _req.query;
+    const {profUUID, topicId: topicIdStr, showSolutions} = _req.query;
 
     if (_.isNil(topicIdStr) || typeof topicIdStr !== 'string') {
         logger.error('Bad topic id. ' + topicIdStr);
@@ -62,6 +63,11 @@ router.get('/', async (_req, _res, next) => {
     if (typeof profUUID !== 'string') {
         logger.error('Bad UUID. ' + profUUID);
         return;
+    }
+
+    let addSolutionToFilename = false;
+    if (showSolutions === 'true') {
+        addSolutionToFilename = true;
     }
 
     const topicId = parseInt(topicIdStr, 10);
@@ -78,7 +84,7 @@ router.get('/', async (_req, _res, next) => {
     }
 
     try {
-        await createZipFromPdfs({profUUID, topicId}, cheatingInMemoryStorage[topicId]);
+        await createZipFromPdfs({profUUID, topicId, addSolutionToFilename}, cheatingInMemoryStorage[topicId]);
     } catch (e) {
         await postBackErrorOrResultToBackend(topicId);
         logger.error(e);

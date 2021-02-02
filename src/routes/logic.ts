@@ -62,7 +62,7 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
 }
 
 export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromises: Promise<string | undefined>[]) => {
-    const {profUUID, topicId} = query;
+    const {profUUID, topicId, addSolutionToFilename} = query;
 
     // The `exports` logical folder in S3 is what our frontend can redirect to.
     const prefix = `exports/${profUUID}/${topicId}`;
@@ -107,7 +107,7 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
     logger.debug('Done archiving, now uploading.');
 
     try {
-        const newFilename = `${prefix}_${Date.now()}.zip`;
+        const newFilename = `${prefix}_${Date.now()}${addSolutionToFilename ? '-solutions' : ''}.zip`;
         const uploadRes = await S3Helper.uploadFromStream(zipFilename, newFilename);
         logger.info(`Uploaded ${newFilename}`);
 

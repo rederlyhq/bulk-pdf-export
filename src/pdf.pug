@@ -63,7 +63,7 @@ body(width="210mm" height="297mm")
     h2(style={'text-align': 'center'}) #{firstName} #{lastName}
     each problem in problems
         if problem.srcdoc
-            h3(style={'break-before': 'always', 'break-after': 'avoid'}) Problem #{problem.number}
+            h3(style={'break-before': 'page', 'break-after': 'avoid'}) Problem #{problem.number}
 
         if problem.effectiveScore
             div Effective Score: #{problem.effectiveScore}%

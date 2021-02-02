@@ -60,6 +60,13 @@ export default class PuppetMaster {
 
             // @ts-ignore - HTMLCollections are iterable in modern Chrome/Firefox.
             for (let iframe of iframes) {
+                // We may want a more specific selector than 'internal'.
+                var showSolution = iframe.contentDocument.getElementsByClassName('internal');
+                for (let solution of showSolution) {
+                    solution.click();
+                }
+
+
                 var expandables = iframe.contentDocument.getElementsByClassName('canopen');
                 for (let expandable of expandables) {
                     expandable.click();
