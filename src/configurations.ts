@@ -141,6 +141,9 @@ const configurations = {
         awsSecretKey: readStringValue('AWS_SECRET_KEY', ''),
         awsRegion: readStringValue('AWS_REGION', 'us-east-2'),
     },
+    backend: {
+        url: readStringValue('BACKEND_URL'),
+    },
     renderer: {
         url: readStringValue('RENDERER_URL'),
     },
@@ -169,7 +172,7 @@ const configurations = {
             }
             // After we log the warnings we can drop the logs, figured it would cause cleanup
             logs = null;
-        });
+        }, 0);
     })
 };
 

@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
         "module": "commonjs",
+        "lib": ["ES2020.Promise", "DOM"],
         "target": "ES6",
         "outDir": "ts-built",
         "resolveJsonModule": true,
