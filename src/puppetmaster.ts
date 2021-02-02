@@ -48,9 +48,6 @@ export default class PuppetMaster {
         const filepathEnc = encodeURIComponent(filepath);
         const page = await browser.newPage();
 
-        // Open accordions
-        await page.$$eval('canopen', elHandles => elHandles.forEach(el => (el as HTMLElement).click()));
-
         // The Express server statically hosts the tmp files.
         await page.goto(`http://127.0.0.1:${configurations.server.port}/export/${filepathEnc}.html`, {waitUntil: ['load', 'networkidle0'], timeout: 120000});
         const mathJaxPromise = page.evaluate(()=>{

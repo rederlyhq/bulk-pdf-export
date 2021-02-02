@@ -13,6 +13,7 @@ import configurations from './configurations';
 import router from './routes';
 import './utilities/array-extension';
 import './utilities/NumberExtensions';
+import './utilities/global-error-handlers';
 
 const { server } = configurations;
 
