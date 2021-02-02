@@ -49,10 +49,11 @@ router.post('/', async (_req, _res, next) => {
 export interface GetExportArchiveOptions {
     profUUID: string;
     topicId: number;
+    addSolutionToFilename: boolean;
 }
 
 router.get('/', async (_req, _res, next) => {
-    const {profUUID, topicId: topicIdStr} = _req.query;
+    const {profUUID, topicId: topicIdStr, showSolutions} = _req.query;
 
     if (_.isNil(topicIdStr) || typeof topicIdStr !== 'string') {
         logger.error('Bad topic id. ' + topicIdStr);
@@ -64,17 +65,26 @@ router.get('/', async (_req, _res, next) => {
         return;
     }
 
+    let addSolutionToFilename = false;
+    if (showSolutions === 'true') {
+        addSolutionToFilename = true;
+    }
+
     const topicId = parseInt(topicIdStr, 10);
 
     // Respond first to not block. This should happen before any async actions.
     logger.info('Responding with OK first.');
     next(httpResponse.Ok('Ok'));
 
-    // Wait for all previous PDF generations for this topic to finish.
-    await Promise.allSettled(cheatingInMemoryStorage[topicId]);
+    try {
+        // Wait for all previous PDF generations for this topic to finish.
+        await Promise.allSettled(cheatingInMemoryStorage[topicId]);
+    } catch (e) {
+        logger.error('Zip was requested before any PDFs were!');
+    }
 
     try {
-        await createZipFromPdfs({profUUID, topicId});
+        await createZipFromPdfs({profUUID, topicId, addSolutionToFilename}, cheatingInMemoryStorage[topicId]);
     } catch (e) {
         await postBackErrorOrResultToBackend(topicId);
         logger.error(e);
@@ -82,5 +92,23 @@ router.get('/', async (_req, _res, next) => {
         delete cheatingInMemoryStorage[topicId];
     }
 });
+
+process.on('SIGTERM', async () => {
+    logger.warn('Cleaning up by updating backend! If you force kill, the backend will have bad data.');
+    // Cleanup and let the backend know we failed.
+    const proms = _.keys(cheatingInMemoryStorage).map(async (topicId) => {
+        logger.info(`Gracefully posted error for ${topicId}.`);
+        try {
+            await postBackErrorOrResultToBackend(parseInt(topicId, 10));
+        } catch (e) {
+            logger.warn(`Failed to gracefully update Topic ${topicId}`);
+        }
+    });
+
+    await Promise.all(proms);
+
+    logger.info('Gracefully exited due to signal.');
+    process.exit(0);
+})
 
 export default router;
