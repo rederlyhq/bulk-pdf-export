@@ -63,7 +63,7 @@ body(width="210mm" height="297mm")
     h2(style={'text-align': 'center'}) #{firstName} #{lastName}
     each problem in problems
         if problem.srcdoc
-            h3(style={'page-break-before': 'always', 'page-break-after': 'avoid'}) Problem #{problem.number}
+            h3(style={'break-before': 'always', 'break-after': 'avoid'}) Problem #{problem.number}
 
         if problem.effectiveScore
             div Effective Score: #{problem.effectiveScore}%
@@ -74,13 +74,13 @@ body(width="210mm" height="297mm")
             iframe(srcdoc=`${problem.srcdoc.trim()}` width='100%' id=`prob${problem.number}`)
             script.
                 // checkOrigin is just for development.
-                iFrameResize({ log: true, checkOrigin: false, autoResize: true, resizeFrom: 'child' }, "#prob#{problem.number}");
+                iFrameResize({ log: false, checkOrigin: true, autoResize: true, resizeFrom: 'child' }, "#prob#{problem.number}");
         else
             h3 Could not render Problem #{problem.number}
 
         each attachment in (problem.attachments || [])
-            | Uploaded at #{attachment.time}
+            div Uploaded at #{attachment.time}
             if attachment.name.endsWith('.pdf')
                 +InlinePdfMixin(attachment.url, attachment.name)
             else
-                img(src=`${attachment.url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'page-break-inside': 'avoid'})
+                img(src=`${attachment.url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'break-inside': 'avoid'})

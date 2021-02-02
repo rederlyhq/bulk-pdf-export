@@ -85,8 +85,6 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
     logger.debug(`Creating /tmp/${topicId}_${Date.now()}.zip`)
     const output = fs.createWriteStream(zipFilename);
     archive.pipe(output);
-    // archive.pipe(stream);
-
 
     await pdfPromises.asyncForEach(async (pdfPromise) => {
         const pdfFilename = await pdfPromise;
@@ -120,6 +118,16 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
         logger.error('Failed to upload to S3 or postback to Backend.', e);
         await postBackErrorOrResultToBackend(topicId);
     }
+
+    await pdfPromises.asyncForEach(async (pdfPromise) => {
+        const pdfFilename = await pdfPromise;
+        if (_.isNil(pdfFilename)) {
+            logger.warn('Got a rejected promise while zipping.');
+            return;
+        }
+
+        fs.unlink(`/tmp/${pdfFilename}.pdf`, () => logger.debug(`Cleaned up /tmp/${pdfFilename}.pdf`));
+    });
 }
 
 export const postBackErrorOrResultToBackend = async (topicId: number, exportUrl?: string): Promise<AxiosResponse> => {
