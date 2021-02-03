@@ -42,12 +42,12 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
         firstName, lastName, topicTitle: name, problems: prettyProblems,
     }), 'utf8');
 
-    logger.info(`Wrote '${htmlFilename}'`);
+    logger.debug(`Wrote '${htmlFilename}'`);
 
     const buffer = await PuppetMaster.safePrint(filename);
 
     fs.unlink(htmlFilename, () => {
-        logger.info(`Cleaned up '${htmlFilename}'`);
+        logger.debug(`Cleaned up '${htmlFilename}'`);
     });
     
     if (_.isNil(buffer) || _.isEmpty(buffer)) {
@@ -128,6 +128,9 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
 
         fs.unlink(`/tmp/${pdfFilename}.pdf`, () => logger.debug(`Cleaned up /tmp/${pdfFilename}.pdf`));
     });
+
+    // Cleaning up Zip file.
+    fs.unlink(zipFilename, () => logger.debug(`Cleaned up ${zipFilename}`));
 }
 
 export const postBackErrorOrResultToBackend = async (topicId: number, exportUrl?: string): Promise<AxiosResponse> => {
