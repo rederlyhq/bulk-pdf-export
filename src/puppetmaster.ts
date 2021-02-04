@@ -28,8 +28,9 @@ export default class PuppetMaster {
     }
 
     static async safePrint(filepath: string) {
-        const perf = performance.now();
+        const perf_wait = performance.now();
         const [value, release] = await PuppetMaster.semaphore.acquire();
+        const perf_work = performance.now();
         logger.debug(`Semaphore acquired with ${value}`);
         try {
             return await PuppetMaster.print(filepath);
@@ -37,7 +38,8 @@ export default class PuppetMaster {
             throw e;
         } finally {
             release();
-            logger.debug(`Release semaphore, request took ${(performance.now() - perf) / 1000} seconds`);
+            const perf_done = performance.now();
+            logger.info(`Released semaphore. Total time: ${((perf_done - perf_wait) / 1000).toFixed(1)} seconds / Printing time: ${((perf_done - perf_work) / 1000).toFixed(1)}`);
         }
     }
     

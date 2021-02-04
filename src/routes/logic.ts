@@ -42,12 +42,16 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
         firstName, lastName, topicTitle: name, problems: prettyProblems,
     }), 'utf8');
 
-    logger.info(`Wrote '${htmlFilename}'`);
+    logger.debug(`Wrote '${htmlFilename}'`);
 
     const buffer = await PuppetMaster.safePrint(filename);
 
-    fs.unlink(htmlFilename, () => {
-        logger.info(`Cleaned up '${htmlFilename}'`);
+    fs.unlink(htmlFilename, (e) => {
+        if (e) {
+            logger.error(e);
+            return;
+        }
+        logger.debug(`Cleaned up '${htmlFilename}'`);
     });
     
     if (_.isNil(buffer) || _.isEmpty(buffer)) {
@@ -117,17 +121,33 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
     } catch (e) {
         logger.error('Failed to upload to S3 or postback to Backend.', e);
         await postBackErrorOrResultToBackend(topicId);
+    } finally {
+        await pdfPromises.asyncForEach(async (pdfPromise) => {
+            const pdfFilename = await pdfPromise;
+            if (_.isNil(pdfFilename)) {
+                logger.warn('Got a rejected promise while zipping.');
+                return;
+            }
+    
+            fs.unlink(`/tmp/${pdfFilename}.pdf`, (e) => {
+                if (e) {
+                    logger.error(e);
+                    return;
+                }
+                logger.debug(`Cleaned up /tmp/${pdfFilename}.pdf`);
+            });
+        });
+    
+        // Cleaning up Zip file.
+        fs.unlink(zipFilename, (e) => {
+            if (e) {
+                logger.error(e);
+                return;
+            }
+            logger.debug(`Cleaned up ${zipFilename}`);
+        });
     }
 
-    await pdfPromises.asyncForEach(async (pdfPromise) => {
-        const pdfFilename = await pdfPromise;
-        if (_.isNil(pdfFilename)) {
-            logger.warn('Got a rejected promise while zipping.');
-            return;
-        }
-
-        fs.unlink(`/tmp/${pdfFilename}.pdf`, () => logger.debug(`Cleaned up /tmp/${pdfFilename}.pdf`));
-    });
 }
 
 export const postBackErrorOrResultToBackend = async (topicId: number, exportUrl?: string): Promise<AxiosResponse> => {
