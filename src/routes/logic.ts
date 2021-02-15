@@ -46,13 +46,7 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
 
     const buffer = await PuppetMaster.safePrint(filename);
 
-    fs.unlink(htmlFilename, (e) => {
-        if (e) {
-            logger.error(e);
-            return;
-        }
-        logger.debug(`Cleaned up '${htmlFilename}'`);
-    });
+    fs.promises.unlink(htmlFilename).then(() => logger.debug(`Successfully unlinked ${htmlFilename}`)).catch(logger.error);
     
     if (_.isNil(buffer) || _.isEmpty(buffer)) {
         logger.error(`Failed to print ${filename}`);
@@ -76,7 +70,7 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
     });
 
     // Listen for archiving errors.
-    archive.on('error', error => {logger.error('Archiver error' + error); postBackErrorOrResultToBackend(topicId);});
+    archive.on('error', error => {logger.error('Archiver error', error); postBackErrorOrResultToBackend(topicId);});
     archive.on('progress', progress => logger.debug(`...${progress.entries.processed}/${progress.entries.total}`));
     archive.on('warning', warning => logger.debug('Archiver warning: ' + warning));
     archive.on('end', () => logger.debug('End archive'));
