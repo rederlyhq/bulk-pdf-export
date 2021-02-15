@@ -80,14 +80,18 @@ router.get('/', async (_req, _res, next) => {
         // Wait for all previous PDF generations for this topic to finish.
         await Promise.allSettled(cheatingInMemoryStorage[topicId]);
     } catch (e) {
-        logger.error('Zip was requested before any PDFs were!');
+        logger.error('Zip was requested before any PDFs were!', e);
     }
 
     try {
         await createZipFromPdfs({profUUID, topicId, addSolutionToFilename}, cheatingInMemoryStorage[topicId]);
-    } catch (e) {
-        await postBackErrorOrResultToBackend(topicId);
-        logger.error(e);
+    } catch (zipError) {
+        logger.error('Failed to zip from PDFs', zipError);
+        try {
+            await postBackErrorOrResultToBackend(topicId);
+        } catch (postbackError) {
+            logger.error('Failed to postback error', postbackError);
+        }
     } finally {
         delete cheatingInMemoryStorage[topicId];
     }
@@ -101,7 +105,7 @@ process.on('SIGTERM', async () => {
         try {
             await postBackErrorOrResultToBackend(parseInt(topicId, 10));
         } catch (e) {
-            logger.warn(`Failed to gracefully update Topic ${topicId}`);
+            logger.warn(`Failed to gracefully update Topic ${topicId}`, e);
         }
     });
 
