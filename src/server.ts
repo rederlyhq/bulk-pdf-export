@@ -109,9 +109,9 @@ app.use((req, res, next) => {
 
 app.use(apiProxy);
 
-app.use(express.urlencoded());
+app.use(express.urlencoded({ limit: '50mb' }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 app.use('/export', express.static('/tmp'))
 
