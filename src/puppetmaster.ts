@@ -83,10 +83,11 @@ export default class PuppetMaster {
         });
 
         // Wait for Mathjax to load, timing out after 10 seconds.
-        await Promise.race([mathJaxPromise, page.waitForTimeout(10000)])
+        await Promise.race([mathJaxPromise, page.waitForTimeout(configurations.puppeteer.mathJaxTimeout)])
 
         // Wait for 3 seconds after network events are done to give time for any extra renderings.
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(configurations.puppeteer.extraTimeout);
+
         const pdf = await page.pdf({
             path: `/tmp/${filepath}.pdf`,
             displayHeaderFooter: true,
