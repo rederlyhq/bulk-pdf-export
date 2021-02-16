@@ -6,7 +6,11 @@ Future Improvements:
 
 Note: If you want to run this natively, you must have a `google-chrome-stable` binary accessible in your path.
 
+### Notes on Docker
+Because the [Renderer](https://github.com/rederly/renderer) is not bundled into this docker container, you need to give the address for it to respond to.
+Similarly, if you're using the [Backend](https://github.com/rederly/backend) to call this microservice, you currently need to specify the address to post errors and success back to. We might be able to grab that from the incoming request in the future.
+
 ```
 docker build -t "bulk-pdf-export" .
-docker run --cap-add=SYS_ADMIN --rm -d -p 3005:3005 bulk-pdf-export:latest 
+docker run --cap-add=SYS_ADMIN --add-host host.docker.internal:host-gateway --rm -d -p 3005:3005 bulk-pdf-export:latest 
 ```

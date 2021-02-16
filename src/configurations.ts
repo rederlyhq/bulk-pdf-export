@@ -150,6 +150,10 @@ const configurations = {
     renderer: {
         url: readStringValue('RENDERER_URL'),
     },
+    puppeteer: {
+        mathJaxTimeout: readIntValue('MATHJAX_TIMEOUT', 30000),
+        extraTimeout: readIntValue('EXTRA_TIMEOUT', 5000),
+    },
     loadPromise: new Promise<void>((resolve, reject) => {
         // Avoid cyclic dependency by deferring the logging until after all the imports are done
         setTimeout(() => {
