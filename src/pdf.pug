@@ -66,9 +66,9 @@ body(width="210mm" height="297mm")
             h3(style={'break-before': 'page', 'break-after': 'avoid'}) Problem #{problem.number}
 
         if problem.effectiveScore
-            div Effective Score: #{problem.effectiveScore}%
+            div Effective Score: #{problem.effectiveScore}
         if problem.legalScore
-            div Original System Score: #{problem.legalScore}%
+            div Original System Score: #{problem.legalScore}
 
         if problem.srcdoc
             iframe(srcdoc=`${problem.srcdoc.trim()}` width='100%' id=`prob${problem.number}`)
