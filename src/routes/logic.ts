@@ -85,14 +85,18 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
     archive.pipe(output);
 
     await pdfPromises.asyncForEach(async (pdfPromise) => {
-        const pdfFilename = await pdfPromise;
-        if (_.isNil(pdfFilename)) {
-            logger.warn('Got a rejected promise while zipping.');
-            return;
-        }
+        try {
+            const pdfFilename = await pdfPromise;
+            if (_.isNil(pdfFilename)) {
+                logger.warn('Got a rejected promise while zipping.');
+                return;
+            }
 
-        logger.debug(`Appended /tmp/${pdfFilename}.pdf to zip.`)
-        archive.file(`/tmp/${pdfFilename}.pdf`, { name: `${pdfFilename}.pdf` });
+            logger.debug(`Appended /tmp/${pdfFilename}.pdf to zip.`)
+            archive.file(`/tmp/${pdfFilename}.pdf`, { name: `${pdfFilename}.pdf` });
+        } catch (e) {
+            logger.error('Failed to add pdf to zip', e);
+        }
     });
 
     try {
