@@ -10,7 +10,7 @@ Array.prototype.asyncForEach = function <T>(callbackfn: (value: T, index: number
         const promise = callbackfn(value, index, array);
         promises.push(promise);
     });
-    return Promise.all(promises);
+    return Promise.allSettled(promises);
 };
 
 Array.prototype.sequentialAsyncForEach = async function <T>(callbackfn: (value: T, index: number, array: T[]) => Promise<unknown>): Promise<unknown[]> {

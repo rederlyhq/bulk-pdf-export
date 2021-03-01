@@ -17,6 +17,7 @@ import { ReplicationRuleAndOperator, _Object } from '@aws-sdk/client-s3';
 import axios, { AxiosResponse } from 'axios';
 import configurations from '../configurations';
 import { GetExportArchiveOptions, MakePDFRequestOptions } from '.';
+import CreatePDFError from '../utilities/CreatePDFError';
 
 const writeFile = util.promisify(fs.writeFile);
 
@@ -29,34 +30,37 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
     const htmlFilename = `/tmp/${filename}.html`;
     const pdfFilename = `/tmp/${filename}.pdf`;
 
-    // Filename is required for caching to work. You must turn this off in development or restart your dev server.
-    const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true});
+    try {
+        // Filename is required for caching to work. You must turn this off in development or restart your dev server.
+        const f = pug.compileFile('src/pdf.pug', { filename: 'topic_student_export', cache: true});
 
-    const prettyProblems = _(problems).sortBy(['number']).map(prob => ({
-        ...prob,
-        effectiveScore: prob.effectiveScore?.toPercentString(),
-        legalScore: prob.legalScore?.toPercentString(),
-    })).value();
+        const prettyProblems = _(problems).sortBy(['number']).map(prob => ({
+            ...prob,
+            effectiveScore: prob.effectiveScore?.toPercentString(),
+            legalScore: prob.legalScore?.toPercentString(),
+        })).value();
 
-    await writeFile(htmlFilename, f({
-        firstName, lastName, topicTitle: name, problems: prettyProblems,
-    }), 'utf8');
+        await writeFile(htmlFilename, f({
+            firstName, lastName, topicTitle: name, problems: prettyProblems,
+        }), 'utf8');
 
-    logger.debug(`Wrote '${htmlFilename}'`);
+        logger.debug(`Wrote '${htmlFilename}'`);
 
-    const buffer = await PuppetMaster.safePrint(filename);
+        const buffer = await PuppetMaster.safePrint(filename);
 
-    fs.promises.unlink(htmlFilename).then(() => logger.debug(`Successfully unlinked ${htmlFilename}`)).catch(logger.error);
-    
-    if (_.isNil(buffer) || _.isEmpty(buffer)) {
-        logger.error(`Failed to print ${filename}`);
-        return;
+        fs.promises.unlink(htmlFilename).then(() => logger.debug(`Successfully unlinked ${htmlFilename}`)).catch(logger.error);
+        
+        if (_.isNil(buffer) || _.isEmpty(buffer)) {
+            logger.error(`Failed to print ${filename}`);
+            return;
+        }
+
+        logger.debug(`Got PDF data of size: ${buffer.length}`);
+        await S3Helper.writeFile(`${prefix}${filename}`, buffer);
+        return filename;
+    } catch (e) {
+        throw new CreatePDFError(`Failed to create PDF because '${e.message}'`, filename);
     }
-
-    logger.debug(`Got PDF data of size: ${buffer.length}`);
-    await S3Helper.writeFile(`${prefix}${filename}`, buffer);
-
-    return filename;
 }
 
 export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromises: Promise<string | undefined>[]) => {
@@ -96,6 +100,9 @@ export const createZipFromPdfs = async (query: GetExportArchiveOptions, pdfPromi
             archive.file(`/tmp/${pdfFilename}.pdf`, { name: `${pdfFilename}.pdf` });
         } catch (e) {
             logger.error('Failed to add pdf to zip', e);
+            if (e instanceof CreatePDFError) {
+                archive.append(`There was an error creating this student's PDF. Please use the Single Export option to print from your browser.`, { name: `${e.errorFilename}.txt` });
+            }
         }
     });
 
