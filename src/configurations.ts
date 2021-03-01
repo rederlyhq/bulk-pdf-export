@@ -151,6 +151,7 @@ const configurations = {
         url: readStringValue('RENDERER_URL'),
     },
     puppeteer: {
+        navigationTimeout: readIntValue('NAVIGATION_TIMEOUT', 300000),
         mathJaxTimeout: readIntValue('MATHJAX_TIMEOUT', 30000),
         extraTimeout: readIntValue('EXTRA_TIMEOUT', 5000),
     },

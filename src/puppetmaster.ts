@@ -51,7 +51,7 @@ export default class PuppetMaster {
         const page = await browser.newPage();
 
         // The Express server statically hosts the tmp files.
-        await page.goto(`http://127.0.0.1:${configurations.server.port}/export/${filepathEnc}.html`, {waitUntil: ['load', 'networkidle0'], timeout: 120000});
+        await page.goto(`http://127.0.0.1:${configurations.server.port}/export/${filepathEnc}.html`, {waitUntil: ['load', 'networkidle0'], timeout: configurations.puppeteer.navigationTimeout});
         const mathJaxPromise = page.evaluate(()=>{
             const iframes = document.getElementsByTagName('iframe');
 
