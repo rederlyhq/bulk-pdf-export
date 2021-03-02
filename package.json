@@ -1,6 +1,6 @@
 {
   "name": "bulk_pdf_export",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "A microservice that expects JSON information to put into a PDF.",
   "main": "server.ts",
   "scripts": {
