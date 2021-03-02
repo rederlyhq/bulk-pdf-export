@@ -4,7 +4,8 @@ const router = express.Router();
 import _ = require('lodash');
 import logger from '../utilities/logger';
 import { _Object } from '@aws-sdk/client-s3';
-import { createPDFFromSrcdoc, createZipFromPdfs, postBackErrorOrResultToBackend } from './logic';
+import { addPDFToZip, createPDFFromSrcdoc, createZip, finalizeZip, postBackErrorOrResultToBackend } from './logic';
+import archiver = require('archiver');
 
 export interface MakePDFRequestOptions {
     firstName: string;
@@ -25,7 +26,10 @@ export interface MakePDFRequestOptions {
 
 // This holds all the promises required to finish before we can zip up the topic.
 const cheatingInMemoryStorage: {
-    [topicId: number]: Promise<string | undefined>[]
+    [topicId: number]: {
+        pdfPromises: Promise<string | undefined>[];
+        zipObject: ZipObject;
+    }
 } = {}
 
 /**
@@ -38,9 +42,16 @@ router.post('/', async (_req, _res, next) => {
     const body = _req.body as MakePDFRequestOptions;
     const topic = body.topic.id;
     
-    cheatingInMemoryStorage[topic] = cheatingInMemoryStorage[topic] ? 
-        [...cheatingInMemoryStorage[topic], createPDFFromSrcdoc(body)] : 
-        [createPDFFromSrcdoc(body)];
+    cheatingInMemoryStorage[topic] = cheatingInMemoryStorage[topic] ?? {
+        pdfPromises: [],
+        zipObject: createZip(topic)
+    };
+
+    const pdfPromise = createPDFFromSrcdoc(body);
+    cheatingInMemoryStorage[topic].pdfPromises.push(pdfPromise);
+
+    addPDFToZip(cheatingInMemoryStorage[topic].zipObject.archive, pdfPromise)
+    .catch(e => logger.error('Route failed to add pdf to zip', e));
 
     // Respond once the promise to finish is created. The work is done asynchronously above.
     next(httpResponse.Ok('Working on it!'));
@@ -50,6 +61,11 @@ export interface GetExportArchiveOptions {
     profUUID: string;
     topicId: number;
     addSolutionToFilename: boolean;
+}
+
+export interface ZipObject {
+    archive: archiver.Archiver;
+    filename: string;
 }
 
 router.get('/', async (_req, _res, next) => {
@@ -78,13 +94,13 @@ router.get('/', async (_req, _res, next) => {
 
     try {
         // Wait for all previous PDF generations for this topic to finish.
-        await Promise.allSettled(cheatingInMemoryStorage[topicId]);
+        await Promise.allSettled(cheatingInMemoryStorage[topicId].pdfPromises);
     } catch (e) {
         logger.error('Zip was requested before any PDFs were!', e);
     }
 
     try {
-        await createZipFromPdfs({profUUID, topicId, addSolutionToFilename}, cheatingInMemoryStorage[topicId]);
+        await finalizeZip(cheatingInMemoryStorage[topicId].zipObject, {profUUID, topicId, addSolutionToFilename}, cheatingInMemoryStorage[topicId].pdfPromises);
     } catch (zipError) {
         logger.error('Failed to zip from PDFs', zipError);
         try {
@@ -113,6 +129,6 @@ process.on('SIGTERM', async () => {
 
     logger.info('Gracefully exited due to signal.');
     process.exit(0);
-})
+});
 
 export default router;
