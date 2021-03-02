@@ -1,10 +1,28 @@
+mixin HeicImg(url, id)
+    img(id=id alt=id src=`${url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'break-inside': 'avoid'})
+    script.
+        (()=>{
+            var url = "#{url}";
+            var name = "#{id}";
+
+            if (!name.toLowerCase().endsWith('.heic')) return;
+            fetch(url)
+                .then((res) => res.blob())
+                .then((blob) => heic2any({ blob }))
+                .then((conversionResult) => {
+                    var heic = document.getElementById("#{id}");
+                    var heicUrl = URL.createObjectURL(conversionResult);
+                    heic.src = heicUrl;
+                });
+        })();
+
 mixin PdfSetupMixin
     script(src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.min.js")
     script.
         //- pdfjsLib.GlobalWorkerOptions.workerSrc = 'node_modules/pdfjs-dist/build/pdf.worker.min.js';
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.min.js';
         function renderPage(pdf, pageNumber, canvas) {
-            pdf.getPage(pageNumber).then(
+            return pdf.getPage(pageNumber).then(
                 function(page) {
                     console.log(page);
                     viewport = page.getViewport({scale: 1});
@@ -46,7 +64,7 @@ mixin InlinePdfMixin(url, id)
                     canvas = document.createElement("canvas");
                     canvas.className = 'pdf-page-canvas';
                     viewer.appendChild(canvas);
-                    renderPage(pdf, page, canvas).promise.then(console.log);
+                    renderPage(pdf, page, canvas).then(console.log);
                 }
             }
         );
@@ -55,6 +73,7 @@ mixin InlinePdfMixin(url, id)
 doctype html
 head
     script(src="/webwork2_files/js/vendor/iframe-resizer/js/iframeResizer.min.js")
+    script(src="https://unpkg.com/heic2any@0.0.3/dist/heic2any.js")
     +PdfSetupMixin
 body(width="210mm" height="297mm")
     //- TODO: Add a Rederly header
@@ -79,7 +98,7 @@ body(width="210mm" height="297mm")
 
         each attachment in (problem.attachments || [])
             div Uploaded at #{attachment.time}
-            if attachment.name.endsWith('.pdf')
+            if attachment.name && attachment.name.toLowerCase().endsWith('.pdf')
                 +InlinePdfMixin(attachment.url, attachment.name)
             else
-                img(src=`${attachment.url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'break-inside': 'avoid'})
+                +HeicImg(attachment.url, attachment.name)
