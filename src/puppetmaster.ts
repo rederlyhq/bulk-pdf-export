@@ -13,7 +13,7 @@ import { performance } from 'perf_hooks';
  */
 
 export default class PuppetMaster {
-    static semaphore = withTimeout(new Semaphore(configurations.app.concurrentPuppeteerTabs), 3600000);
+    static semaphore = withTimeout(new Semaphore(configurations.app.concurrentPuppeteerTabs), 600000);
 
     static browser: Promise<puppeteer.Browser> = puppeteer.launch({
         executablePath: 'google-chrome-stable'
@@ -45,13 +45,29 @@ export default class PuppetMaster {
     
     static async print(filepath: string) {
         const browser = await PuppetMaster.browser;
-        if (!browser) return;
+        if (!browser) throw new Error('No browser instance available.');
 
         const filepathEnc = encodeURIComponent(filepath);
+
+        logger.debug('Creating a new page on the browser.');
         const page = await browser.newPage();
 
+        logger.debug('Attaching console listeners.');
+        page
+            .on('console', message => {
+                if (message.type() === 'error' || message.type() === 'warning') {
+                    logger.error(`${message.type().substr(0, 3).toUpperCase()} ${message.text()}`);
+                }
+            })
+            .on('pageerror', ({ message }) => logger.error(message))
+            // .on('response', response => logger.debug(`${response.status()} ${response.url()}`))
+            .on('requestfailed', request => logger.error(`${request.failure()?.errorText} ${request.url()}`))
+
+        logger.debug(`Navigating to ${filepathEnc}.html`);
         // The Express server statically hosts the tmp files.
         await page.goto(`http://127.0.0.1:${configurations.server.port}/export/${filepathEnc}.html`, {waitUntil: ['load', 'networkidle0'], timeout: configurations.puppeteer.navigationTimeout});
+        
+        logger.debug('Injecting MathJax Promises.');
         const mathJaxPromise = page.evaluate(()=>{
             const iframes = document.getElementsByTagName('iframe');
 
@@ -82,12 +98,15 @@ export default class PuppetMaster {
             return Promise.all(mathJaxPromises);
         });
 
+        logger.debug('Waiting for Mathjax.');
         // Wait for Mathjax to load, timing out after 10 seconds.
         await Promise.race([mathJaxPromise, page.waitForTimeout(configurations.puppeteer.mathJaxTimeout)])
 
+        logger.debug('Waiting for extra time.');
         // Wait for 3 seconds after network events are done to give time for any extra renderings.
         await page.waitForTimeout(configurations.puppeteer.extraTimeout);
 
+        logger.debug('Waiting to make a PDF.');
         const pdf = await page.pdf({
             path: `/tmp/${filepath}.pdf`,
             displayHeaderFooter: true,
@@ -99,7 +118,11 @@ export default class PuppetMaster {
                 bottom: '30px',
             },
         });
+
+        logger.debug('Closing the tab.');
         await page.close();
+
+        logger.debug('Returning the PDF');
         return pdf;
     }
 }
