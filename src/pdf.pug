@@ -8,18 +8,30 @@ mixin HeicImg(url, id)
 
             if (!name.toLowerCase().endsWith('.heic')) return;
             console.warn('HEIC: Starting', url);
+            
+            var heic = document.getElementById("#{id}");
 
             fetch(url)
                 .then((res) => res.blob())
                 .then((blob) => heic2any({ blob }))
                 .then((conversionResult) => {
                     console.warn('HEIC: Success!');
-                    var heic = document.getElementById("#{id}");
                     var heicUrl = URL.createObjectURL(conversionResult);
+                    heic.onload = () => {
+                        // TODO downgrade to log
+                        console.warn('HEIC: LOAD EVENT SUCCESS');
+                        heic.dispatchEvent(new Event('heicDone'));
+                    }
+                    heic.onerror = (e) => {
+                        console.error(`HEIC: Failed to load ${heic.src}`);
+                        heic.dispatchEvent(new Event('heicDone'));
+                    }
                     heic.src = heicUrl;
-                    heic.dispatchEvent(new Event('heicDone'));
                 })
-                .catch(console.error);
+                .catch((e) => {
+                    console.error('HEIC: Failed to fetch', e);
+                    heic.dispatchEvent(new Event('heicDone'));
+                });
         })();
 
 mixin PdfSetupMixin
