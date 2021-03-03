@@ -4,16 +4,22 @@ mixin HeicImg(url, id)
         (()=>{
             var url = "#{url}";
             var name = "#{id}";
+            console.warn('HEIC: Checking', name);
 
             if (!name.toLowerCase().endsWith('.heic')) return;
+
+            console.warn('HEIC: Starting', url);
+
             fetch(url)
                 .then((res) => res.blob())
                 .then((blob) => heic2any({ blob }))
                 .then((conversionResult) => {
+                    console.warn('HEIC: Success!');
                     var heic = document.getElementById("#{id}");
                     var heicUrl = URL.createObjectURL(conversionResult);
                     heic.src = heicUrl;
-                });
+                })
+                .catch(console.error);
         })();
 
 mixin PdfSetupMixin
@@ -53,11 +59,10 @@ mixin InlinePdfMixin(url, id)
     script.
         var thePdf = null;
         var scale = 1;
-        console.log('Getting ' + "#{url}");
+        console.warn('Getting ' + "#{url}");
         pdfjsLib.getDocument("#{url}").promise.then(
             function(pdf) {
-                console.log(pdf);
-                console.log('Got pdf of ' + pdf.numPages + ' pages');
+                console.warn('Got pdf of ' + pdf.numPages + ' pages');
 
                 viewer = document.getElementById("#{id}");
                 for (page = 1; page <= pdf.numPages; page++) {
