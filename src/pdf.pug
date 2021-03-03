@@ -1,5 +1,5 @@
 mixin HeicImg(url, id)
-    img(id=id alt=id src=`${url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'break-inside': 'avoid'})
+    img(id=id alt=id class='heic' src=`${url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'break-inside': 'avoid'})
     script.
         (()=>{
             var url = "#{url}";
@@ -7,7 +7,6 @@ mixin HeicImg(url, id)
             console.warn('HEIC: Checking', name);
 
             if (!name.toLowerCase().endsWith('.heic')) return;
-
             console.warn('HEIC: Starting', url);
 
             fetch(url)
@@ -105,5 +104,7 @@ body(width="210mm" height="297mm")
             div Uploaded at #{attachment.time}
             if attachment.name && attachment.name.toLowerCase().endsWith('.pdf')
                 +InlinePdfMixin(attachment.url, attachment.name)
-            else
+            else if attachment.name && attachment.name.toLowerCase().endsWith('.heic')
                 +HeicImg(attachment.url, attachment.name)
+            else
+                img(alt=attachment.name src=`${url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'break-inside': 'avoid'})
