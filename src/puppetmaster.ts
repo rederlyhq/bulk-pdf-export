@@ -1,10 +1,8 @@
 import { Semaphore, withTimeout } from 'async-mutex';
-import { isNull } from 'lodash';
 import _ = require('lodash');
 import * as puppeteer from 'puppeteer-core';
 import configurations from './configurations';
 import logger from './utilities/logger';
-import S3Helper from './utilities/s3-helper';
 import { performance } from 'perf_hooks';
 
 /**
@@ -101,11 +99,11 @@ export default class PuppetMaster {
             for (let heic of heics) {
                 mathJaxPromises.push(new Promise<void>((resolveSingleHasLoaded, reject2) => {
                     if (heic.src && heic.src.startsWith('blob:')) {
-                        logger.info('Heic already loaded!')
+                        console.warn('Heic already loaded!')
                         resolveSingleHasLoaded();
                     } else {
                         heic.addEventListener('heicDone', ()=>{
-                            logger.info('Heic EVENT finished!');
+                            console.warn('Heic EVENT finished!');
                             resolveSingleHasLoaded();
                         });
                     }

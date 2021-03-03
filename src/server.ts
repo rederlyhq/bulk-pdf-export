@@ -20,14 +20,6 @@ const { server } = configurations;
 
 const app = express();
 
-const apiProxy = createProxyMiddleware('/webwork2_files/**', {
-    target: configurations.renderer.url ?? undefined,
-    changeOrigin: true,
-    // logLevel: 'debug',
-    // onError: console.log,
-    // onProxyReq: console.log
-});
-
 interface ErrorResponse {
     statusCode: number;
     status: string;
@@ -107,7 +99,21 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(apiProxy);
+app.use(createProxyMiddleware('/webwork2_files/**', {
+    target: configurations.renderer.url,
+    changeOrigin: true,
+    // logLevel: 'debug',
+    // onError: console.log,
+    // onProxyReq: console.log
+}));
+
+app.use(createProxyMiddleware('/work/**', {
+    target: configurations.app.attachmentsBaseURL,
+    changeOrigin: true,
+    // logLevel: 'debug',
+    // onError: console.log,
+    // onProxyReq: console.log
+}));
 
 app.use(express.urlencoded({ limit: '50mb' }));
 
