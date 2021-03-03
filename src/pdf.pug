@@ -17,6 +17,7 @@ mixin HeicImg(url, id)
                     var heic = document.getElementById("#{id}");
                     var heicUrl = URL.createObjectURL(conversionResult);
                     heic.src = heicUrl;
+                    heic.dispatchEvent(new Event('heicDone'));
                 })
                 .catch(console.error);
         })();

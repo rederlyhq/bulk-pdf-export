@@ -95,6 +95,23 @@ export default class PuppetMaster {
                 }));
             }
 
+            const heics = document.getElementsByClassName('heic');
+
+            // @ts-ignore - HTMLCollections are iterable in modern Chrome/Firefox.
+            for (let heic of heics) {
+                mathJaxPromises.push(new Promise<void>((resolveSingleHasLoaded, reject2) => {
+                    if (heic.src && heic.src.startsWith('blob:')) {
+                        logger.info('Heic already loaded!')
+                        resolveSingleHasLoaded();
+                    } else {
+                        heic.addEventListener('heicDone', ()=>{
+                            logger.info('Heic EVENT finished!');
+                            resolveSingleHasLoaded();
+                        });
+                    }
+                }));
+            }
+
             return Promise.all(mathJaxPromises);
         });
 
