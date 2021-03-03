@@ -108,6 +108,7 @@ const nodeEnv = readStringValue('NODE_ENV', 'development');
 // needs to be read ahead of of time to be used in configurations
 const isProduction = nodeEnv === 'production';
 
+const rederlyURL = readStringValue('REDERLY_URL', 'http://localhost:3002');
 const configurations = {
     app: {
         nodeEnv: nodeEnv,
@@ -116,6 +117,8 @@ const configurations = {
         failOnMissingConfigurations: readBooleanValue('FAIL_ON_MISSING_CONFIGURATIONS', isProduction),
         concurrentPuppeteerTabs: readIntValue('CONCURRENT_PUPPETEER_TABS', 5),
         configSalt: readStringValue('CONFIG_SALT', ''),
+        rederlyURL: rederlyURL,
+        attachmentsBaseURL: readStringValue('ATTACHMENTS_BASE_URL', rederlyURL),
     },
     server: {
         port: readStringValue('SERVER_PORT', '3005'),
@@ -145,10 +148,10 @@ const configurations = {
         awsRegion: readStringValue('AWS_REGION', 'us-east-2'),
     },
     backend: {
-        url: readStringValue('BACKEND_URL'),
+        url: readStringValue('BACKEND_URL', rederlyURL),
     },
     renderer: {
-        url: readStringValue('RENDERER_URL'),
+        url: readStringValue('RENDERER_URL', rederlyURL),
     },
     puppeteer: {
         navigationTimeout: readIntValue('NAVIGATION_TIMEOUT', 300000),
