@@ -1,3 +1,17 @@
+# The instructions for the first stage
+FROM node:lts-buster as builder
+WORKDIR /app
+# install app dependencies
+COPY package.json ./
+COPY package-lock.json ./
+RUN npm install --silent
+
+# Seems like this would be a problem if you already locally had node modules
+COPY . ./
+
+# Builds and creates the package, does not create an archive
+RUN REDERLY_PACKAGER_ARCHIVE=false npm run build:package
+
 # https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#running-puppeteer-in-docker
 FROM node:lts-buster
 
@@ -21,23 +35,18 @@ RUN Xvfb :99 -ac -screen 0 1280x720x16 -nolisten tcp &
 ENV DISPLAY :99
 
 WORKDIR /app
-WORKDIR /work
 
 ENV PATH /app/node_modules/.bin:$PATH
 
-COPY package*.json ./
-RUN npm install
-
-COPY . ./
-
-RUN REDERLY_PACKAGER_ARCHIVE=false npm run build:package && groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
+RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
     && mkdir -p /home/pptruser/Downloads \
     && chown -R pptruser:pptruser /home/pptruser \
-    && chown -R pptruser:pptruser /app \
-    && mv build/* ../app && cd .. && rm -r work
+    && chown -R pptruser:pptruser /app
 
-WORKDIR /app
-COPY ./.env ./
+COPY --from=builder /app/build ./rederly-bulk-pdf-export
+COPY --from=builder /app/.env ./rederly-bulk-pdf-export/
+
+WORKDIR /app/rederly-bulk-pdf-export
 
 # Run everything after as non-privileged user.
 USER pptruser
