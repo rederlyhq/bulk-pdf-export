@@ -1,0 +1,19 @@
+node_modules
+
+ts-built
+build
+package-outputs
+
+tmp
+
+logs
+*.DS_Store
+
+.vscode
+.github
+
+testdata.json
+example.env
+
+# Should be ignored but can't be ignored since we use it
+# .env

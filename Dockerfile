@@ -21,17 +21,23 @@ RUN Xvfb :99 -ac -screen 0 1280x720x16 -nolisten tcp &
 ENV DISPLAY :99
 
 WORKDIR /app
+WORKDIR /work
 
 ENV PATH /app/node_modules/.bin:$PATH
 
-COPY *.json ./
-COPY .env ./
-COPY ./src ./src
+COPY package*.json ./
+RUN npm install
 
-RUN npm install --silent && npm run build && groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
+COPY . ./
+
+RUN REDERLY_PACKAGER_ARCHIVE=false npm run build:package && groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
     && mkdir -p /home/pptruser/Downloads \
     && chown -R pptruser:pptruser /home/pptruser \
-    && chown -R pptruser:pptruser /app
+    && chown -R pptruser:pptruser /app \
+    && mv build/* ../app && cd .. && rm -r work
+
+WORKDIR /app
+COPY ./.env ./
 
 # Run everything after as non-privileged user.
 USER pptruser
