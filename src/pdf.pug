@@ -1,18 +1,36 @@
 mixin HeicImg(url, id)
-    img(id=id alt=id src=`${url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'break-inside': 'avoid'})
+    img(id=id alt=id class='heic' src=`${url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'break-before': 'page', 'break-inside': 'avoid'})
     script.
         (()=>{
             var url = "#{url}";
             var name = "#{id}";
+            console.warn('HEIC: Checking', name);
 
             if (!name.toLowerCase().endsWith('.heic')) return;
+            console.warn('HEIC: Starting', url);
+            
+            var heic = document.getElementById("#{id}");
+
             fetch(url)
                 .then((res) => res.blob())
                 .then((blob) => heic2any({ blob }))
                 .then((conversionResult) => {
-                    var heic = document.getElementById("#{id}");
+                    console.warn('HEIC: Success!');
                     var heicUrl = URL.createObjectURL(conversionResult);
+                    heic.onload = () => {
+                        // TODO downgrade to log
+                        console.warn('HEIC: LOAD EVENT SUCCESS');
+                        heic.dispatchEvent(new Event('heicDone'));
+                    }
+                    heic.onerror = (e) => {
+                        console.error(`HEIC: Failed to load ${heic.src}`);
+                        heic.dispatchEvent(new Event('heicDone'));
+                    }
                     heic.src = heicUrl;
+                })
+                .catch((e) => {
+                    console.error('HEIC: Failed to fetch', e);
+                    heic.dispatchEvent(new Event('heicDone'));
                 });
         })();
 
@@ -53,11 +71,10 @@ mixin InlinePdfMixin(url, id)
     script.
         var thePdf = null;
         var scale = 1;
-        console.log('Getting ' + "#{url}");
+        console.warn('Getting ' + "#{url}");
         pdfjsLib.getDocument("#{url}").promise.then(
             function(pdf) {
-                console.log(pdf);
-                console.log('Got pdf of ' + pdf.numPages + ' pages');
+                console.warn('Got pdf of ' + pdf.numPages + ' pages');
 
                 viewer = document.getElementById("#{id}");
                 for (page = 1; page <= pdf.numPages; page++) {
@@ -97,8 +114,10 @@ body(width="210mm" height="297mm")
             h3 Could not render Problem #{problem.number}
 
         each attachment, attachmentIndex in (problem.attachments || [])
-            div Uploaded at #{attachment.time}
+            div #{attachment.name} (Uploaded at #{attachment.time})
             if attachment.name && attachment.name.toLowerCase().endsWith('.pdf')
                 +InlinePdfMixin(attachment.url, `${problemIndex}_${attachmentIndex}_${attachment.name}`)
-            else
+            else if attachment.name && attachment.name.toLowerCase().endsWith('.heic')
                 +HeicImg(attachment.url, `${problemIndex}_${attachmentIndex}_${attachment.name}`)
+            else
+                img(alt=attachment.name src=attachment.url style={'max-width': '100% !important', 'max-height': '100% !important', 'break-before': 'page', 'break-inside': 'avoid'})
