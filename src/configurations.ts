@@ -155,7 +155,7 @@ const configurations = {
     },
     puppeteer: {
         navigationTimeout: readIntValue('NAVIGATION_TIMEOUT', 300000),
-        mathJaxTimeout: readIntValue('MATHJAX_TIMEOUT', 30000),
+        resourceTimeout: readIntValue('RESOURCE_TIMEOUT', 30000),
         extraTimeout: readIntValue('EXTRA_TIMEOUT', 5000),
     },
     loadPromise: new Promise<void>((resolve, reject) => {

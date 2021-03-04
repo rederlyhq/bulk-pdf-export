@@ -69,7 +69,7 @@ export default class PuppetMaster {
         const mathJaxPromise = page.evaluate(()=>{
             const iframes = document.getElementsByTagName('iframe');
 
-            const mathJaxPromises = [];
+            const resourcePromises = [];
 
             // @ts-ignore - HTMLCollections are iterable in modern Chrome/Firefox.
             for (let iframe of iframes) {
@@ -85,8 +85,8 @@ export default class PuppetMaster {
                     expandable.click();
                 }
 
-                mathJaxPromises.push(new Promise<void>((resolveSingleHasLoaded, reject2) => {
-                    if (!iframe.contentWindow.MathJax || !iframe.contentWindow.MathJax.Hub) return;
+                resourcePromises.push(new Promise<void>((resolveSingleHasLoaded) => {
+                    if (!iframe.contentWindow.MathJax || !iframe.contentWindow.MathJax.Hub) return resolveSingleHasLoaded();
                     iframe.contentWindow.MathJax.Hub.Register.StartupHook("End", function () {
                         resolveSingleHasLoaded();
                     });
@@ -97,25 +97,25 @@ export default class PuppetMaster {
 
             // @ts-ignore - HTMLCollections are iterable in modern Chrome/Firefox.
             for (let heic of heics) {
-                mathJaxPromises.push(new Promise<void>((resolveSingleHasLoaded, reject2) => {
+                resourcePromises.push(new Promise<void>((resolveSingleHasLoaded) => {
                     if (heic.src && heic.src.startsWith('blob:')) {
-                        console.warn('Heic already loaded!')
+                        console.warn('HEIC: already loaded!')
                         resolveSingleHasLoaded();
                     } else {
                         heic.addEventListener('heicDone', ()=>{
-                            console.warn('Heic EVENT finished!');
+                            console.warn('HEIC: EVENT finished!');
                             resolveSingleHasLoaded();
                         });
                     }
                 }));
             }
 
-            return Promise.all(mathJaxPromises);
+            return Promise.all(resourcePromises);
         });
 
         logger.debug('Waiting for Mathjax.');
         // Wait for Mathjax to load, timing out after 10 seconds.
-        await Promise.race([mathJaxPromise, page.waitForTimeout(configurations.puppeteer.mathJaxTimeout)])
+        await Promise.race([mathJaxPromise, page.waitForTimeout(configurations.puppeteer.resourceTimeout)])
 
         logger.debug('Waiting for extra time.');
         // Wait for 3 seconds after network events are done to give time for any extra renderings.
