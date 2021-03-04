@@ -66,7 +66,7 @@ export default class PuppetMaster {
         await page.goto(`http://127.0.0.1:${configurations.server.port}/export/${filepathEnc}.html`, {waitUntil: ['load', 'networkidle0'], timeout: configurations.puppeteer.navigationTimeout});
         
         logger.debug('Injecting MathJax Promises.');
-        const mathJaxPromise = page.evaluate(()=>{
+        const resourcePromise = page.evaluate(()=>{
             const iframes = document.getElementsByTagName('iframe');
 
             const resourcePromises = [];
@@ -113,9 +113,9 @@ export default class PuppetMaster {
             return Promise.all(resourcePromises);
         });
 
-        logger.debug('Waiting for Mathjax.');
+        logger.debug('Waiting for Resources (Mathjax, HEIC).');
         // Wait for Mathjax to load, timing out after 10 seconds.
-        await Promise.race([mathJaxPromise, page.waitForTimeout(configurations.puppeteer.resourceTimeout)])
+        await Promise.race([resourcePromise, page.waitForTimeout(configurations.puppeteer.resourceTimeout)])
 
         logger.debug('Waiting for extra time.');
         // Wait for 3 seconds after network events are done to give time for any extra renderings.
