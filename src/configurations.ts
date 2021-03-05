@@ -159,6 +159,7 @@ const configurations = {
         navigationTimeout: readIntValue('NAVIGATION_TIMEOUT', 300000),
         resourceTimeout: readIntValue('RESOURCE_TIMEOUT', 30000),
         extraTimeout: readIntValue('EXTRA_TIMEOUT', 5000),
+        logFromPage: readBooleanValue('LOG_FROM_PAGE', true),
     },
     loadPromise: new Promise<void>((resolve, reject) => {
         // Avoid cyclic dependency by deferring the logging until after all the imports are done

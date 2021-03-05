@@ -14,7 +14,12 @@ import { PDFPriorityData, cheatingInMemoryStorage, globalHeapManager } from './g
  */
 
 export default class PuppetMaster {
-    static semaphore = withTimeout<PDFPriorityData>(new Semaphore<PDFPriorityData>(configurations.app.concurrentPuppeteerTabs), configurations.puppeteer.tabSemaphoreTimeout);
+    static semaphore = withTimeout<PDFPriorityData>(
+        new Semaphore<PDFPriorityData>(
+            configurations.app.concurrentPuppeteerTabs, new Error('Request was cancelled.'), globalHeapManager
+        ), 
+        configurations.puppeteer.tabSemaphoreTimeout
+    );
 
     static browser: Promise<puppeteer.Browser> = puppeteer.launch({
         executablePath: 'google-chrome-stable'
@@ -26,8 +31,6 @@ export default class PuppetMaster {
                 executablePath: 'google-chrome-stable'
             });
         }
-
-        (PuppetMaster.semaphore as any).queue = new HeapHelper<any>();
     }
 
     static async safePrint(pdfFilePath: string, urlPath: string, priority: PDFPriorityData) {
@@ -59,6 +62,26 @@ export default class PuppetMaster {
         }
     }
     
+    static attachPageListeners = (page: puppeteer.Page) => {
+        if (configurations.puppeteer.logFromPage) {
+            page.on('console', message => {
+                const type = message.type();
+                const text = message.text();
+
+                if (type === 'error') {
+                    logger.error(`From Page - ${text}`);
+                } else if (type === 'warning') {
+                    logger.warn(`From Page - ${text}`);
+                } else if (text.startsWith('HEIC') || text.startsWith('PDF')) {
+                    logger.debug(`From Page - ${text}`);
+                }
+            })
+            .on('pageerror', ({ message }) => logger.error(message))
+            // .on('response', response => logger.debug(`${response.status()} ${response.url()}`))
+            .on('requestfailed', request => logger.error(`${request.failure()?.errorText} ${request.url()}`))
+        }
+    }
+
     static async print(pdfFilePath: string, urlPath: string) {
         const browser = await PuppetMaster.browser;
         if (!browser) throw new Error('No browser instance available.');
@@ -67,21 +90,7 @@ export default class PuppetMaster {
         const page = await browser.newPage();
 
         logger.debug('Attaching console listeners.');
-        page.on('console', message => {
-            const type = message.type();
-            const text = message.text();
-
-            if (type === 'error') {
-                logger.error(`From Page - ${text}`);
-            } else if (type === 'warning') {
-                logger.warn(`From Page - ${text}`);
-            } else if (text.startsWith('HEIC') || text.startsWith('PDF')) {
-                logger.debug(`From Page - ${text}`);
-            }
-        })
-        .on('pageerror', ({ message }) => logger.error(message))
-        // .on('response', response => logger.debug(`${response.status()} ${response.url()}`))
-        .on('requestfailed', request => logger.error(`${request.failure()?.errorText} ${request.url()}`))
+        PuppetMaster.attachPageListeners(page);
 
         logger.debug(`Navigating to ${urlPath}.html`);
         // The Express server statically hosts the tmp files.

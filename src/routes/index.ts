@@ -30,6 +30,7 @@ router.post('/', async (req, _res, next) => {
 
     // If the topic doesn't have a lock yet, acquire one! Then, wait for that lock before processing.
     if (_.isNil(cheatingInMemoryStorage[topic].lock) || _.isEmpty(cheatingInMemoryStorage[topic].lock)) {
+        logger.info(`Acquiring a lock for topic ${topic}`);
         cheatingInMemoryStorage[topic].lock = globalTopicSemaphore.acquire();
     }
     await cheatingInMemoryStorage[topic].lock;
@@ -39,6 +40,7 @@ router.post('/', async (req, _res, next) => {
 
     // If this is one of the first N PDFs, give elevated priority.
     if (cheatingInMemoryStorage[topic].pdfPromises.length < configurations.app.highPriorityTabsPerTopic) {
+        logger.debug(`Assigning an initial high priority to ${topic}/${body.firstName}`);
         newPriority.prio = 99;
     }
 
@@ -95,6 +97,13 @@ router.get('/', async (_req, _res, next) => {
             logger.error('Failed to postback error', postbackError);
         }
     } finally {
+        try {
+            logger.debug(`${topicId} has finished, releasing lock.`);
+            const [, release] = await cheatingInMemoryStorage[topicId].lock;
+            release();
+        } catch (e) {
+            logger.error(`WTF: The lock for ${topicId} disappeared from under us. ${cheatingInMemoryStorage[topicId]}`, e);
+        }
         delete cheatingInMemoryStorage[topicId];
     }
 });
