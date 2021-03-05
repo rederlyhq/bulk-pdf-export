@@ -1,0 +1,32 @@
+node_modules
+
+ts-built
+build
+package-outputs
+
+tmp
+
+logs
+*.DS_Store
+
+.vscode
+.github
+
+testdata.json
+example.env
+
+# Should be ignored but can't be ignored since we use it
+# .env
+
+# We don't use git in the docker file
+.git
+.gitignore
+
+# We don't use docker in the docker file
+.dockerignore
+Dockerfile
+
+# We don't use these files
+LICENSE.md
+Readme.md
+
