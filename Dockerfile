@@ -4,6 +4,7 @@ WORKDIR /app
 # install app dependencies
 COPY package.json ./
 COPY package-lock.json ./
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 RUN npm install --silent
 
 # Seems like this would be a problem if you already locally had node modules
@@ -27,7 +28,6 @@ RUN apt-get update \
       --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 ENV PUPPETEER_PRODUCT chrome
 
 # Start Xvfb
@@ -43,13 +43,12 @@ RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
     && chown -R pptruser:pptruser /home/pptruser \
     && chown -R pptruser:pptruser /app
 
-COPY --from=builder /app/build ./rederly-bulk-pdf-export
-COPY --from=builder /app/.env ./rederly-bulk-pdf-export/
-
-WORKDIR /app/rederly-bulk-pdf-export
-
 # Run everything after as non-privileged user.
 USER pptruser
 
 EXPOSE 3005
+
+COPY --from=builder /app/build /app
+COPY --from=builder /app/.env /app/
+
 CMD ["node", "--trace-warnings", "ts-built/app-scripts/index.js"]
