@@ -50,6 +50,7 @@ console.log(`Starting to package project into ${destFile}`);
     });
     const filesToCopy = [
         builtDirectory,
+        'assets',
         'package.json',
         'package-lock.json',
     ];
