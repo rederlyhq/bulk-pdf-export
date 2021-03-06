@@ -51,7 +51,7 @@ export default class S3Helper {
             },
         });
 
-        upload.on('httpUploadProgress', (progress) => logger.debug(`uploadFromStream: ${progress}`));
+        upload.on('httpUploadProgress', (progress) => logger.debug(`uploadFromStream: progress`, progress));
         pass.on('error', (err) => logger.error('uploadFromStream: Error piping data to aws', err));
         pass.on('close', () => logger.debug('uploadFromStream: Piping to aws stream closed'));
         
