@@ -1,8 +1,7 @@
 import _ = require('lodash');
 import logger from '../utilities/logger';
 import * as pug from 'pug';
-import * as fs from 'fs';
-import * as util from 'util';
+import * as fs from 'fs-extra';
 import PuppetMaster from '../puppetmaster';
 import S3Helper from '../utilities/s3-helper';
 import * as archiver from 'archiver';
@@ -11,16 +10,24 @@ import axios, { AxiosResponse } from 'axios';
 import configurations from '../configurations';
 import { GetExportArchiveOptions, MakePDFRequestOptions, ZipObject } from '.';
 import CreatePDFError from '../utilities/CreatePDFError';
+import path = require('path');
 
-const writeFile = util.promisify(fs.writeFile);
+const writeFile = fs.promises.writeFile;
 
-export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
-    const {firstName, lastName, topic: {name, id}, problems, professorUUID} = body;
+const tempBaseDirectory = `${configurations.server.tempDirectory}/`;
+const topicTempDirectory = (topicId: number) => `${tempBaseDirectory}${topicId}`;
+const htmlTempFile = (topicId: number, fileBasename: string) => `${topicTempDirectory(topicId)}/${fileBasename}.html`;
+const pdfTempFile = (topicId: number, fileBasename: string) => `${topicTempDirectory(topicId)}/${fileBasename}.pdf`;
+const awsTopicKey = (professorUUID: string, topicId: number) => `exports/${professorUUID}/${topicId}/`;
+const awsPDFKey = (professorUUID: string, topicId: number, fileBasename: string, addSolutionsToFilename: boolean) => `exports/${professorUUID}/${topicId}/${fileBasename}${addSolutionsToFilename ? '-solutions': ''}.pdf`;
+const awsZipKey = (professorUUID: string, topicId: number, addSolutionsToFilename: boolean) => `${awsTopicKey(professorUUID, topicId)}${topicId}_${Date.now()}${addSolutionsToFilename ? '-solutions' : ''}.zip`;
+
+export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSolutionToFilename: boolean) => {
+    const {firstName, lastName, topic: {name, id: topicId}, problems, professorUUID} = body;
     logger.info(`Got request to export ${firstName}'s topic with ${problems.length} problems.`);
 
-    const filename = `${name}_${lastName}_${firstName}`;
-    const prefix =  `exports/${professorUUID}/${id}/`;
-    const htmlFilename = `/tmp/${filename}.html`;
+    const baseFilename = `${name}_${lastName}_${firstName}`;
+    const htmlFilepath = htmlTempFile(topicId, baseFilename);
 
     try {
         // Filename is required for caching to work. You must turn this off in development or restart your dev server.
@@ -32,34 +39,32 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions) => {
             legalScore: prob.legalScore?.toPercentString(),
         })).value();
 
-        await writeFile(htmlFilename, f({
+        await fs.mkdirp(path.dirname(htmlFilepath));
+        await writeFile(htmlFilepath, f({
             firstName, lastName, topicTitle: name, problems: prettyProblems
         }), 'utf8');
 
-        logger.debug(`Wrote '${htmlFilename}'`);
+        logger.debug(`Wrote '${htmlFilepath}'`);
 
-        const buffer = await PuppetMaster.safePrint(filename);
+        const buffer = await PuppetMaster.safePrint(pdfTempFile(topicId, baseFilename), encodeURIComponent(htmlFilepath.substring(tempBaseDirectory.length)));
 
-        fs.promises.unlink(htmlFilename).then(() => logger.debug(`Successfully unlinked ${htmlFilename}`)).catch(logger.error);
+        fs.promises.unlink(htmlFilepath)
+        .then(() => logger.debug(`Successfully unlinked ${htmlFilepath}`)).catch(logger.error);
         
         if (_.isNil(buffer) || _.isEmpty(buffer)) {
-            logger.error(`Failed to print ${filename}`);
+            logger.error(`Failed to print ${baseFilename}`);
             return;
         }
 
         logger.debug(`Got PDF data of size: ${buffer.length}`);
-        await S3Helper.writeFile(`${prefix}${filename}`, buffer);
-        return filename;
+        await S3Helper.writeFile(awsPDFKey(professorUUID, topicId, baseFilename, addSolutionToFilename), buffer);
+        return baseFilename;
     } catch (e) {
-        throw new CreatePDFError(`Failed to create PDF because '${e.message}'`, filename);
+        throw new CreatePDFError(`Failed to create PDF because '${e.message}'`, baseFilename);
     }
 }
 
-export const createZip = (topicId: number): {
-    archive: archiver.Archiver;
-    filename: string;
-} => {
-
+export const createZip = (topicId: number, professorUUID: string, addSolutionsToFilename: boolean): ZipObject => {
     const archive = archiver('zip', {
         zlib: { level: 9 } // Sets the compression level.
     });
@@ -72,38 +77,43 @@ export const createZip = (topicId: number): {
     archive.on('close', () => logger.debug('Closing archive'));
     archive.on('drain', () => logger.debug('Draining archive'));
 
-    // Pipe the data from the archive to S3.
-    const zipFilename = `/tmp/${topicId}_${Date.now()}.zip`;
+    const awsKey = awsZipKey(professorUUID, topicId, addSolutionsToFilename);
 
-    logger.debug(`Creating ${zipFilename}`)
-    const output = fs.createWriteStream(zipFilename);
-    archive.pipe(output);
+    const {
+        stream,
+        upload,
+        uploadDonePromise
+    } = S3Helper.uploadFromStream(awsKey);
+
+    archive.pipe(stream);
+
     return {
         archive: archive,
-        filename: zipFilename
+        upload: upload,
+        awsKey: awsKey,
+        uploadDonePromise: uploadDonePromise
     };
 }
 
-export const addPDFToZip = async (archive: archiver.Archiver, pdfPromise: Promise<string | undefined>) => {
+export const addPDFToZip = async (archive: archiver.Archiver, pdfPromise: Promise<string | undefined>, topicId: number) => {
     try {
-        const pdfFilename = await pdfPromise;
-        const pdfFilenameWithExtension = `${pdfFilename}.pdf`;
-        const pdfFilepath = `/tmp/${pdfFilename}.pdf`;
+        const baseFilename = await pdfPromise;
 
-        if (_.isNil(pdfFilename)) {
+        if (_.isNil(baseFilename)) {
             logger.warn('Got a rejected promise while zipping.');
             return;
         }
 
+        const pdfFilepath = pdfTempFile(topicId, baseFilename);
         logger.debug(`Appended ${pdfFilepath} to zip.`)
         const pdfReadStream = fs.createReadStream(pdfFilepath);
-        pdfReadStream.on('error', (error) => logger.error('Erroring reading pdf', error));
+        pdfReadStream.on('error', (error: unknown) => logger.error('Erroring reading pdf', error));
         pdfReadStream.on('close', () => {
             fs.promises.unlink(pdfFilepath)
             .then(() => logger.debug('Deleted pdf after adding to zip'))
             .catch(e => logger.error('Unable to delete pdf after adding to zip', e));    
         });
-        archive.append(pdfReadStream, { name: pdfFilenameWithExtension });
+        archive.append(pdfReadStream, { name: path.basename(pdfFilepath) });
     } catch (e) {
         logger.error('Failed to add pdf to zip', e);
         if (e instanceof CreatePDFError) {
@@ -113,9 +123,7 @@ export const addPDFToZip = async (archive: archiver.Archiver, pdfPromise: Promis
 };
 
 export const finalizeZip = async (zipObject: ZipObject, query: GetExportArchiveOptions, pdfPromises: Promise<string | undefined>[]) => {
-    const {profUUID, topicId, addSolutionToFilename} = query;
-    // The `exports` logical folder in S3 is what our frontend can redirect to.
-    const prefix = `exports/${profUUID}/${topicId}`;
+    const {topicId} = query;
 
     try {
         await zipObject.archive.finalize();
@@ -127,9 +135,9 @@ export const finalizeZip = async (zipObject: ZipObject, query: GetExportArchiveO
     logger.debug('Done archiving, now uploading.');
 
     try {
-        const newFilename = `${prefix}_${Date.now()}${addSolutionToFilename ? '-solutions' : ''}.zip`;
-        const uploadRes = await S3Helper.uploadFromStream(zipObject.filename, newFilename);
-        logger.info(`Uploaded ${newFilename}`);
+        logger.debug('finalizeZip: Waiting for upload to finish')
+        const uploadRes = await zipObject.uploadDonePromise;
+        logger.debug('finalizeZip: Upload complete')
 
         await postBackErrorOrResultToBackend(topicId, (uploadRes as _Object).Key)
 
@@ -137,30 +145,19 @@ export const finalizeZip = async (zipObject: ZipObject, query: GetExportArchiveO
     } catch (e) {
         logger.error('Failed to upload to S3 or postback to Backend.', e);
         await postBackErrorOrResultToBackend(topicId);
-    } finally {
-        await pdfPromises.asyncForEach(async (pdfPromise) => {
-            const pdfFilename = await pdfPromise;
-            if (_.isNil(pdfFilename)) {
-                logger.warn('Got a rejected promise while zipping.');
-                return;
-            }
-
-            const pdfPath = `/tmp/${pdfFilename}.pdf`;
-
-            if (fs.existsSync(pdfPath)) {
-                fs.promises.unlink(pdfPath)
-                .then(() => logger.debug(`Cleaned up /tmp/${pdfFilename}.pdf`))
-                .catch(e => logger.error('Failed to delete pdf file', e));
-            }
-        });
-
-        fs.promises.unlink(zipObject.filename)
-        .then(() => logger.debug(`Cleaned up ${zipObject.filename}`))
-        .catch(e => logger.error('Failed to delete zip file', e));
     }
 };
 
 export const postBackErrorOrResultToBackend = async (topicId: number, exportUrl?: string): Promise<AxiosResponse> => {
+    const topicTempDirectoryPath = topicTempDirectory(topicId);
+    if (fs.existsSync(topicTempDirectoryPath)) {
+        fs.remove(topicTempDirectoryPath)
+        .then(() => logger.debug('postBackErrorOrResultToBackend: deleted tmp directory'))
+        .catch((e) => logger.error(`postBackErrorOrResultToBackend: could not delete temp directory ${topicTempDirectoryPath}`, e));    
+    } else {
+        logger.warn(`postBackErrorOrResultToBackend: tried to delete temp directory but it did not exist "${topicTempDirectoryPath}"`);
+    }
+
     return await axios.put(`${configurations.backend.url}/backend-api/courses/topic/${topicId}/endExport`, {
         exportUrl
     });
