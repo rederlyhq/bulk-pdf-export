@@ -1,9 +1,7 @@
 import * as dotenv from 'dotenv';
-import * as dotenvExpand from 'dotenv-expand';
 import * as _ from 'lodash';
 import * as crypto from 'crypto';
 dotenv.config();
-dotenvExpand(dotenv.config({ path: './prisma/.env' }));
 import { LoggingLevelType, LOGGING_LEVEL } from './utilities/logger-logging-levels';
 
 let logs: Array<string> | null = [];
@@ -128,6 +126,7 @@ const configurations = {
         logAccess: readBooleanValue('SERVER_LOG_ACCESS', true),
         logAccessSlowRequestThreshold: readIntValue('SERVER_LOG_ACCESS_SLOW_REQUEST_THRESHOLD', 30000),
         requestTimeout: readIntValue('SERVER_REQUEST_TIMEOUT', 150000),
+        tempDirectory: readStringValue('SERVER_TEMP_DIRECTORY', 'tmp'),
         // limiter: {
         //     windowLength: readIntValue('SERVER_LIMITER_WINDOW_LENGTH', 60000),
         //     maxRequests: readIntValue('SERVER_LIMITER_MAX_REQUESTS', 100),
