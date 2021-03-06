@@ -3,9 +3,10 @@ import httpResponse from '../utilities/http-response';
 const router = express.Router();
 import _ = require('lodash');
 import logger from '../utilities/logger';
-import { _Object } from '@aws-sdk/client-s3';
+import { ServiceOutputTypes, _Object } from '@aws-sdk/client-s3';
 import { addPDFToZip, createPDFFromSrcdoc, createZip, finalizeZip, postBackErrorOrResultToBackend } from './logic';
 import archiver = require('archiver');
+import { Upload } from '@aws-sdk/lib-storage';
 
 export interface MakePDFRequestOptions {
     firstName: string;
@@ -38,19 +39,23 @@ const cheatingInMemoryStorage: {
  * topicTitle
  * problems: [{number, srcdoc, attachments}]
  */
-router.post('/', async (_req, _res, next) => {
-    const body = _req.body as MakePDFRequestOptions;
+router.post('/', async (req, _res, next) => {
+    const {showSolutions} = req.query;
+    const body = req.body as MakePDFRequestOptions;
+
+    const addSolutionToFilename = showSolutions === 'true';
     const topic = body.topic.id;
-    
+
     cheatingInMemoryStorage[topic] = cheatingInMemoryStorage[topic] ?? {
         pdfPromises: [],
-        zipObject: createZip(topic)
+        zipObject: createZip(topic, body.professorUUID, addSolutionToFilename),
+        professorUUID: body.professorUUID,
     };
 
-    const pdfPromise = createPDFFromSrcdoc(body);
+    const pdfPromise = createPDFFromSrcdoc(body, addSolutionToFilename);
     cheatingInMemoryStorage[topic].pdfPromises.push(pdfPromise);
 
-    addPDFToZip(cheatingInMemoryStorage[topic].zipObject.archive, pdfPromise)
+    addPDFToZip(cheatingInMemoryStorage[topic].zipObject.archive, pdfPromise, topic)
     .catch(e => logger.error('Route failed to add pdf to zip', e));
 
     // Respond once the promise to finish is created. The work is done asynchronously above.
@@ -65,7 +70,9 @@ export interface GetExportArchiveOptions {
 
 export interface ZipObject {
     archive: archiver.Archiver;
-    filename: string;
+    awsKey: string;
+    upload: Upload;
+    uploadDonePromise: Promise<ServiceOutputTypes>;
 }
 
 router.get('/', async (_req, _res, next) => {

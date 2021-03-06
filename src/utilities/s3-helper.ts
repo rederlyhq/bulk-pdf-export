@@ -1,5 +1,4 @@
 import {S3Client, PutObjectCommand, S3, _Object} from '@aws-sdk/client-s3';
-import { config } from 'dotenv/types';
 import stream = require('stream');
 import configurations from '../configurations';
 import logger from './logger';
@@ -22,13 +21,13 @@ export default class S3Helper {
     static async writeFile(awsFilename: string, body: string | Buffer | Uint8Array | ReadableStream<any> | Blob) {
         return await S3Helper.s3client.send(new PutObjectCommand({
             Bucket: configurations.aws.bucket,
-            Key: `${awsFilename}.pdf`,
+            Key: awsFilename,
             Body: body,
         }));
     }
 
     // This is used to upload a Zip file from a stream.
-    static uploadFromStream(localFilename: string, awsFilename: string) {
+    static uploadFile(localFilename: string, awsFilename: string) {
         return new Upload({
             client: S3Helper.s3,
             params: {
@@ -38,6 +37,33 @@ export default class S3Helper {
             },
         }).done();
       }
+
+    // This is used to upload a Zip file from a stream.
+    static uploadFromStream(awsFilename: string) {
+        const pass = new stream.PassThrough();
+        const upload = new Upload({
+            client: S3Helper.s3,
+            leavePartsOnError: true,
+            params: {
+                Bucket: configurations.aws.bucket,
+                Key: awsFilename,
+                Body: pass,
+            },
+        });
+
+        upload.on('httpUploadProgress', (progress) => logger.debug(`uploadFromStream: ${progress}`));
+        pass.on('error', (err) => logger.error('uploadFromStream: Error piping data to aws', err));
+        pass.on('close', () => logger.debug('uploadFromStream: Piping to aws stream closed'));
+        
+        const uploadDonePromise = upload.done();
+        const startTime = new Date();
+        uploadDonePromise.then(() => {
+            const duration = new Date().getTime() - startTime.getTime();
+            logger.info(`uploadFromStream: uploaded to aws in ${duration} milliseconds`)
+        });
+
+        return {stream: pass, upload: upload, uploadDonePromise: uploadDonePromise};
+    }
 
     static async getFilesInFolder(folderPath: string) {
         const files = await S3Helper.s3.listObjects({

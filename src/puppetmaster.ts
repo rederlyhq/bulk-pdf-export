@@ -4,6 +4,7 @@ import * as puppeteer from 'puppeteer-core';
 import configurations from './configurations';
 import logger from './utilities/logger';
 import { performance } from 'perf_hooks';
+import path = require('path');
 
 /**
  * An important part of the PDF generation is waiting for the HTML page to finish loading all content.
@@ -25,13 +26,13 @@ export default class PuppetMaster {
         }
     }
 
-    static async safePrint(filepath: string) {
+    static async safePrint(pdfFilePath: string, urlPath: string) {
         const perf_wait = performance.now();
         const [value, release] = await PuppetMaster.semaphore.acquire();
         const perf_work = performance.now();
         logger.debug(`Semaphore acquired with ${value}`);
         try {
-            return await PuppetMaster.print(filepath);
+            return await PuppetMaster.print(pdfFilePath, urlPath);
         } catch(e) {
             throw e;
         } finally {
@@ -41,11 +42,9 @@ export default class PuppetMaster {
         }
     }
     
-    static async print(filepath: string) {
+    static async print(pdfFilePath: string, urlPath: string) {
         const browser = await PuppetMaster.browser;
         if (!browser) throw new Error('No browser instance available.');
-
-        const filepathEnc = encodeURIComponent(filepath);
 
         logger.debug('Creating a new page on the browser.');
         const page = await browser.newPage();
@@ -61,9 +60,9 @@ export default class PuppetMaster {
             // .on('response', response => logger.debug(`${response.status()} ${response.url()}`))
             .on('requestfailed', request => logger.error(`${request.failure()?.errorText} ${request.url()}`))
 
-        logger.debug(`Navigating to ${filepathEnc}.html`);
+        logger.debug(`Navigating to ${urlPath}.html`);
         // The Express server statically hosts the tmp files.
-        await page.goto(`http://127.0.0.1:${configurations.server.port}/export/${filepathEnc}.html`, {waitUntil: ['load', 'networkidle0'], timeout: configurations.puppeteer.navigationTimeout});
+        await page.goto(`http://127.0.0.1:${configurations.server.port}/export/${urlPath}`, {waitUntil: ['load', 'networkidle0'], timeout: configurations.puppeteer.navigationTimeout});
         
         logger.debug('Injecting MathJax Promises.');
         const mathJaxPromise = page.evaluate(()=>{
@@ -123,7 +122,7 @@ export default class PuppetMaster {
 
         logger.debug('Waiting to make a PDF.');
         const pdf = await page.pdf({
-            path: `/tmp/${filepath}.pdf`,
+            path: pdfFilePath,
             displayHeaderFooter: true,
             // This currently does not work with our docker build because of https://github.com/puppeteer/puppeteer/issues/5663
             // headerTemplate: '<div style="font-family: Tahoma, Verdana, Segoe, sans-serif; font-size: 6px; padding-left:10px; background-color: red; color:black;"><span class="pageNumber"></span> of <span class="totalPages"></span> Exported by Rederly, Inc.</div>',
