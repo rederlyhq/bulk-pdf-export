@@ -1,79 +1,58 @@
 import * as express from 'express';
 import httpResponse from '../utilities/http-response';
 const router = express.Router();
-import _ = require('lodash');
+import _ from 'lodash';
 import logger from '../utilities/logger';
-import { ServiceOutputTypes, _Object } from '@aws-sdk/client-s3';
+import { _Object } from '@aws-sdk/client-s3';
 import { addPDFToZip, createPDFFromSrcdoc, createZip, finalizeZip, postBackErrorOrResultToBackend } from './logic';
-import archiver = require('archiver');
-import { Upload } from '@aws-sdk/lib-storage';
+import configurations from '../configurations';
+import { cheatingInMemoryStorage, globalTopicSemaphore, PDFPriorityData } from '../globals';
+import { MakePDFRequestOptions } from './interfaces';
 
-export interface MakePDFRequestOptions {
-    firstName: string;
-    lastName: string;
-    topic: {
-        name: string;
-        id: number;
-    };
-    professorUUID: string;
-    problems: {
-        number: number;
-        srcdoc: string;
-        attachments: {url: string; name: string; time: Date}[];
-        effectiveScore?: number;
-        legalScore?: number;
-    }[];
-};
-
-// This holds all the promises required to finish before we can zip up the topic.
-const cheatingInMemoryStorage: {
-    [topicId: number]: {
-        pdfPromises: Promise<string | undefined>[];
-        zipObject: ZipObject;
-    }
-} = {}
-
-/**
- * firstName
- * lastName
- * topicTitle
- * problems: [{number, srcdoc, attachments}]
- */
+// This route generates the PDF from a MakePDFRequestOptions object.
 router.post('/', async (req, _res, next) => {
     const {showSolutions} = req.query;
     const body = req.body as MakePDFRequestOptions;
 
     const addSolutionToFilename = showSolutions === 'true';
     const topic = body.topic.id;
-
+    
+    // Respond immediately. The work is done asynchronously below.
+    next(httpResponse.Ok('Working on it!'));
+    
     cheatingInMemoryStorage[topic] = cheatingInMemoryStorage[topic] ?? {
         pdfPromises: [],
         zipObject: createZip(topic, body.professorUUID, addSolutionToFilename),
         professorUUID: body.professorUUID,
+        pendingPriorities: [],
+        lock: undefined,
     };
 
-    const pdfPromise = createPDFFromSrcdoc(body, addSolutionToFilename);
+    // If the topic doesn't have a lock yet, acquire one! Then, wait for that lock before processing.
+    if (_.isNil(cheatingInMemoryStorage[topic].lock) || _.isEmpty(cheatingInMemoryStorage[topic].lock)) {
+        cheatingInMemoryStorage[topic].lock = globalTopicSemaphore.acquire();
+    }
+    await cheatingInMemoryStorage[topic].lock;
+
+
+    const newPriority: PDFPriorityData = { prio: 0, topicId: topic, profUUID: body.professorUUID, firstName: body.firstName };
+
+    // If this is one of the first N PDFs, give elevated priority.
+    if (cheatingInMemoryStorage[topic].pdfPromises.length < configurations.app.highPriorityTabsPerTopic) {
+        newPriority.prio = 99;
+    }
+
+    cheatingInMemoryStorage[topic].pendingPriorities.push(newPriority);
+
+    const pdfPromise = createPDFFromSrcdoc(body, addSolutionToFilename, newPriority);
     cheatingInMemoryStorage[topic].pdfPromises.push(pdfPromise);
 
-    addPDFToZip(cheatingInMemoryStorage[topic].zipObject.archive, pdfPromise, topic)
-    .catch(e => logger.error('Route failed to add pdf to zip', e));
-
-    // Respond once the promise to finish is created. The work is done asynchronously above.
-    next(httpResponse.Ok('Working on it!'));
+    try {
+        addPDFToZip(cheatingInMemoryStorage[topic].zipObject.archive, pdfPromise, topic);
+    } catch (e) {
+        logger.error('Route failed to add pdf to zip', e);
+    }
 });
-
-export interface GetExportArchiveOptions {
-    profUUID: string;
-    topicId: number;
-    addSolutionToFilename: boolean;
-}
-
-export interface ZipObject {
-    archive: archiver.Archiver;
-    awsKey: string;
-    upload: Upload;
-    uploadDonePromise: Promise<ServiceOutputTypes>;
-}
 
 router.get('/', async (_req, _res, next) => {
     const {profUUID, topicId: topicIdStr, showSolutions} = _req.query;

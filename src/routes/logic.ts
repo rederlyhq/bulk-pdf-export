@@ -1,16 +1,17 @@
-import _ = require('lodash');
+import _ from 'lodash';
 import logger from '../utilities/logger';
 import * as pug from 'pug';
 import * as fs from 'fs-extra';
 import PuppetMaster from '../puppetmaster';
 import S3Helper from '../utilities/s3-helper';
-import * as archiver from 'archiver';
+import archiver from 'archiver';
 import { _Object } from '@aws-sdk/client-s3';
 import axios, { AxiosResponse } from 'axios';
 import configurations from '../configurations';
-import { GetExportArchiveOptions, MakePDFRequestOptions, ZipObject } from '.';
 import CreatePDFError from '../utilities/CreatePDFError';
 import path = require('path');
+import { PDFPriorityData, ZipObject } from '../globals';
+import { MakePDFRequestOptions, GetExportArchiveOptions } from './interfaces';
 
 const writeFile = fs.promises.writeFile;
 
@@ -22,7 +23,7 @@ const awsTopicKey = (professorUUID: string, topicId: number) => `exports/${profe
 const awsPDFKey = (professorUUID: string, topicId: number, fileBasename: string, addSolutionsToFilename: boolean) => `exports/${professorUUID}/${topicId}/${fileBasename}${addSolutionsToFilename ? '-solutions': ''}.pdf`;
 const awsZipKey = (professorUUID: string, topicId: number, addSolutionsToFilename: boolean) => `${awsTopicKey(professorUUID, topicId)}${topicId}_${Date.now()}${addSolutionsToFilename ? '-solutions' : ''}.zip`;
 
-export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSolutionToFilename: boolean) => {
+export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSolutionToFilename: boolean, priority: PDFPriorityData) => {
     const {firstName, lastName, topic: {name, id: topicId}, problems, professorUUID} = body;
     logger.info(`Got request to export ${firstName}'s topic with ${problems.length} problems.`);
 
@@ -46,14 +47,14 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSoluti
 
         logger.debug(`Wrote '${htmlFilepath}'`);
 
-        const buffer = await PuppetMaster.safePrint(pdfTempFile(topicId, baseFilename), encodeURIComponent(htmlFilepath.substring(tempBaseDirectory.length)));
+        const buffer = await PuppetMaster.safePrint(pdfTempFile(topicId, baseFilename), encodeURIComponent(htmlFilepath.substring(tempBaseDirectory.length)), priority);
 
         fs.promises.unlink(htmlFilepath)
         .then(() => logger.debug(`Successfully unlinked ${htmlFilepath}`)).catch(logger.error);
         
         if (_.isNil(buffer) || _.isEmpty(buffer)) {
             logger.error(`Failed to print ${baseFilename}`);
-            return;
+            throw new Error(`Failed to print ${baseFilename}, buffer came back empty.`);
         }
 
         logger.debug(`Got PDF data of size: ${buffer.length}`);

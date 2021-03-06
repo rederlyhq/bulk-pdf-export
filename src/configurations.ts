@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import * as crypto from 'crypto';
 dotenv.config();
 import { LoggingLevelType, LOGGING_LEVEL } from './utilities/logger-logging-levels';
@@ -114,6 +114,8 @@ const configurations = {
         logMissingConfigurations: readBooleanValue('LOG_MISSING_CONFIGURATIONS', true),
         failOnMissingConfigurations: readBooleanValue('FAIL_ON_MISSING_CONFIGURATIONS', isProduction),
         concurrentPuppeteerTabs: readIntValue('CONCURRENT_PUPPETEER_TABS', 5),
+        highPriorityTabsPerTopic: readIntValue('HIGH_PRIORITY_TABS_PER_TOPIC', 1),
+        concurrentTopicsLimit: readIntValue('CONCURRENT_TOPICS_LIMIT', 5),
         configSalt: readStringValue('CONFIG_SALT', ''),
         rederlyURL: rederlyURL,
         attachmentsBaseURL: readStringValue('ATTACHMENTS_BASE_URL', rederlyURL),
@@ -153,6 +155,7 @@ const configurations = {
         url: readStringValue('RENDERER_URL', rederlyURL),
     },
     puppeteer: {
+        tabSemaphoreTimeout: readIntValue('NAVIGATION_TIMEOUT', 3600000),
         navigationTimeout: readIntValue('NAVIGATION_TIMEOUT', 300000),
         resourceTimeout: readIntValue('RESOURCE_TIMEOUT', 30000),
         extraTimeout: readIntValue('EXTRA_TIMEOUT', 5000),
