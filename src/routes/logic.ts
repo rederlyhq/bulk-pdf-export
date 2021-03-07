@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import logger from '../utilities/logger';
 import * as pug from 'pug';
-import * as fs from 'fs-extra';
+import {writeFile, unlink, mkdirp, createReadStream, existsSync, remove } from 'fs-extra';
 import PuppetMaster from '../puppetmaster';
 import S3Helper from '../utilities/s3-helper';
 import archiver from 'archiver';
@@ -12,8 +12,6 @@ import CreatePDFError from '../utilities/CreatePDFError';
 import path = require('path');
 import { PDFPriorityData, ZipObject } from '../globals';
 import { MakePDFRequestOptions, GetExportArchiveOptions } from './interfaces';
-
-const writeFile = fs.promises.writeFile;
 
 const tempBaseDirectory = `${configurations.server.tempDirectory}/`;
 const topicTempDirectory = (topicId: number) => `${tempBaseDirectory}${topicId}`;
@@ -40,7 +38,7 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSoluti
             legalScore: prob.legalScore?.toPercentString(),
         })).value();
 
-        await fs.mkdirp(path.dirname(htmlFilepath));
+        await mkdirp(path.dirname(htmlFilepath));
         await writeFile(htmlFilepath, f({
             firstName, lastName, topicTitle: name, problems: prettyProblems
         }), 'utf8');
@@ -49,7 +47,7 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSoluti
 
         const buffer = await PuppetMaster.safePrint(pdfTempFile(topicId, baseFilename), encodeURIComponent(htmlFilepath.substring(tempBaseDirectory.length)), priority);
 
-        fs.promises.unlink(htmlFilepath)
+        unlink(htmlFilepath)
         .then(() => logger.debug(`Successfully unlinked ${htmlFilepath}`)).catch(logger.error);
         
         if (_.isNil(buffer) || _.isEmpty(buffer)) {
@@ -107,10 +105,10 @@ export const addPDFToZip = async (archive: archiver.Archiver, pdfPromise: Promis
 
         const pdfFilepath = pdfTempFile(topicId, baseFilename);
         logger.debug(`Appended ${pdfFilepath} to zip.`)
-        const pdfReadStream = fs.createReadStream(pdfFilepath);
+        const pdfReadStream = createReadStream(pdfFilepath);
         pdfReadStream.on('error', (error: unknown) => logger.error('Erroring reading pdf', error));
         pdfReadStream.on('close', () => {
-            fs.promises.unlink(pdfFilepath)
+            unlink(pdfFilepath)
             .then(() => logger.debug('Deleted pdf after adding to zip'))
             .catch(e => logger.error('Unable to delete pdf after adding to zip', e));    
         });
@@ -151,8 +149,8 @@ export const finalizeZip = async (zipObject: ZipObject, query: GetExportArchiveO
 
 export const postBackErrorOrResultToBackend = async (topicId: number, exportUrl?: string): Promise<AxiosResponse> => {
     const topicTempDirectoryPath = topicTempDirectory(topicId);
-    if (fs.existsSync(topicTempDirectoryPath)) {
-        fs.remove(topicTempDirectoryPath)
+    if (existsSync(topicTempDirectoryPath)) {
+        remove(topicTempDirectoryPath)
         .then(() => logger.debug('postBackErrorOrResultToBackend: deleted tmp directory'))
         .catch((e) => logger.error(`postBackErrorOrResultToBackend: could not delete temp directory ${topicTempDirectoryPath}`, e));    
     } else {

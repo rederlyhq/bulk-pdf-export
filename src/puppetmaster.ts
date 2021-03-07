@@ -50,7 +50,7 @@ export default class PuppetMaster {
 
             const nextPendingPromise = cheatingInMemoryStorage[priority.topicId].pendingPriorities.first;
             
-            if (!_.isNil(nextPendingPromise)) {
+            if (!_.isNil(nextPendingPromise) && priority.prio > 0) {
                 logger.debug(`Updating a priority from ${nextPendingPromise.prio} to ${priority.prio - 1} for ${nextPendingPromise.firstName}.`);
                 nextPendingPromise.prio = priority.prio - 1;
                 globalHeapManager.heapify();

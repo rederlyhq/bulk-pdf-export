@@ -29,12 +29,13 @@ router.post('/', async (req, _res, next) => {
     };
 
     // If the topic doesn't have a lock yet, acquire one! Then, wait for that lock before processing.
-    if (_.isNil(cheatingInMemoryStorage[topic].lock) || _.isEmpty(cheatingInMemoryStorage[topic].lock)) {
-        logger.info(`Acquiring a lock for topic ${topic}`);
+    if (_.isNil(cheatingInMemoryStorage[topic].lock)) {
+        logger.info(`Creating a lock for topic ${topic}`);
         cheatingInMemoryStorage[topic].lock = globalTopicSemaphore.acquire();
     }
+    
+    logger.debug(`Acquiring a lock for topic ${topic}`);
     await cheatingInMemoryStorage[topic].lock;
-
 
     const newPriority: PDFPriorityData = { prio: 0, topicId: topic, profUUID: body.professorUUID, firstName: body.firstName };
 
@@ -80,11 +81,20 @@ router.get('/', async (_req, _res, next) => {
     logger.info(`Responding to request to zip ${topicId} with OK first.`);
     next(httpResponse.Ok('Ok'));
 
+    // If the topic doesn't have a lock yet, acquire one! Then, wait for that lock before processing.
+    if (_.isNil(cheatingInMemoryStorage[topicId].lock)) {
+        logger.error(`Zip called, but the topic ${topicId} hasn't created a request for a lock yet.`)
+        throw new Error('Zip called too soon.');
+    }
+    logger.info(`Acquiring a lock to print topic ${topicId}`);
+    const [, release] = await cheatingInMemoryStorage[topicId].lock;
+
     try {
         // Wait for all previous PDF generations for this topic to finish.
         await Promise.allSettled(cheatingInMemoryStorage[topicId].pdfPromises);
     } catch (e) {
         logger.error('Zip was requested before any PDFs were!', e);
+        throw new Error('Zip called too soon.');
     }
 
     try {
@@ -99,7 +109,6 @@ router.get('/', async (_req, _res, next) => {
     } finally {
         try {
             logger.debug(`${topicId} has finished, releasing lock.`);
-            const [, release] = await cheatingInMemoryStorage[topicId].lock;
             release();
         } catch (e) {
             logger.error(`WTF: The lock for ${topicId} disappeared from under us. ${cheatingInMemoryStorage[topicId]}`, e);

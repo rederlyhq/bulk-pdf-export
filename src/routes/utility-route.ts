@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 const router = require('express').Router();
 import httpResponse from '../utilities/http-response';
-import * as _ from 'lodash';
-import * as fs from 'fs';
+import _ from 'lodash';
+import { readFile } from 'fs';
 import * as path from 'path';
 import logger from '../utilities/logger';
 import configurations from '../configurations';
@@ -15,7 +15,7 @@ const packageJSONPath = '../../package.json';
  * Can't use import here because the rootDir is jailed to src (which makes sense)
  */
 const versionPromise = new Promise<string | null>((resolve, reject) => {
-    fs.readFile(path.join(__dirname, packageJSONPath), (err: Error | null, data: Buffer) => {
+    readFile(path.join(__dirname, packageJSONPath), (err: Error | null, data: Buffer) => {
         if (err) {
             reject(err);
         } else {
