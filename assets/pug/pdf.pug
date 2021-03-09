@@ -13,7 +13,7 @@ mixin HeicImg(url, id)
 
             fetch(url)
                 .then((res) => res.blob())
-                .then((blob) => heic2any({ blob }))
+                .then((blob) => window.sequentialHeic2any(blob))
                 .then((conversionResult) => {
                     console.warn('HEIC: Success!');
                     var heicUrl = URL.createObjectURL(conversionResult);
@@ -91,6 +91,19 @@ doctype html
 head
     script(src="/webwork2_files/js/vendor/iframe-resizer/js/iframeResizer.min.js")
     script(src="https://unpkg.com/heic2any@0.0.3/dist/heic2any.js")
+    script.
+        let currentHEICPromise = Promise.resolve();
+        window.sequentialHeic2any = (blob) => {
+            //- This is what we were originally doing, however we noticed that the browser waits for all to load before rendering anything
+            //- With this fix they lazy load in; so if it times out before all resourses are done you get some
+            //- return heic2any({ blob });
+            const result = (async () => {
+                await currentHEICPromise;
+                return heic2any({ blob });
+            })();
+            currentHEICPromise = result;
+            return result;
+        };
     +PdfSetupMixin
 body(width="210mm" height="297mm")
     //- TODO: Add a Rederly header
