@@ -33,15 +33,14 @@ router.post('/', async (req, _res, next) => {
         logger.info(`Creating a lock for topic ${topic}`);
         cheatingInMemoryStorage[topic].lock = globalTopicSemaphore.acquire();
     }
-    
-    logger.debug(`Acquiring a lock for topic ${topic}`);
+
     await cheatingInMemoryStorage[topic].lock;
 
     const newPriority: PDFPriorityData = { prio: 0, topicId: topic, profUUID: body.professorUUID, firstName: body.firstName };
 
     // If this is one of the first N PDFs, give elevated priority.
     if (cheatingInMemoryStorage[topic].pdfPromises.length < configurations.app.highPriorityTabsPerTopic) {
-        logger.debug(`Assigning an initial high priority to ${topic}/${body.firstName}`);
+        logger.debug(`[${topic}] Assigning an initial high priority of 99 to ${body.firstName}`);
         newPriority.prio = 99;
     }
 
@@ -53,7 +52,7 @@ router.post('/', async (req, _res, next) => {
     try {
         addPDFToZip(cheatingInMemoryStorage[topic].zipObject.archive, pdfPromise, topic);
     } catch (e) {
-        logger.error('Route failed to add pdf to zip', e);
+        logger.error(`[${topic}] Route failed to add pdf to zip`, e);
     }
 });
 

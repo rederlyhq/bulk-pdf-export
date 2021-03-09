@@ -70,7 +70,7 @@ export const createZip = (topicId: number, professorUUID: string, addSolutionsTo
 
     // Listen for archiving errors.
     archive.on('error', error => {logger.error('Archiver error', error); postBackErrorOrResultToBackend(topicId);});
-    archive.on('progress', progress => logger.debug(`...${progress.entries.processed}/${progress.entries.total}`));
+    archive.on('progress', progress => logger.debug(`[${topicId}] ...${progress.entries.processed}/${progress.entries.total}`));
     archive.on('warning', warning => logger.debug('Archiver warning: ' + warning));
     archive.on('end', () => logger.debug('End archive'));
     archive.on('close', () => logger.debug('Closing archive'));
@@ -99,12 +99,12 @@ export const addPDFToZip = async (archive: archiver.Archiver, pdfPromise: Promis
         const baseFilename = await pdfPromise;
 
         if (_.isNil(baseFilename)) {
-            logger.warn('Got a rejected promise while zipping.');
+            logger.warn(`[${topicId}] Got a rejected promise while zipping.`);
             return;
         }
 
         const pdfFilepath = pdfTempFile(topicId, baseFilename);
-        logger.debug(`Appended ${pdfFilepath} to zip.`)
+        logger.debug(`[${topicId}] Appended ${pdfFilepath} to zip.`)
         const pdfReadStream = createReadStream(pdfFilepath);
         pdfReadStream.on('error', (error: unknown) => logger.error('Erroring reading pdf', error));
         pdfReadStream.on('close', () => {

@@ -5,7 +5,6 @@ import configurations from './configurations';
 import logger from './utilities/logger';
 import { performance } from 'perf_hooks';
 import path = require('path');
-import HeapHelper from './utilities/heap-helper';
 import { PDFPriorityData, cheatingInMemoryStorage, globalHeapManager } from './globals';
 
 /**
@@ -35,30 +34,30 @@ export default class PuppetMaster {
 
     static async safePrint(pdfFilePath: string, urlPath: string, priority: PDFPriorityData) {
         const perf_wait = performance.now();
-        // TODO: Run Exclusively.
+        logger.debug(`[${priority.topicId}] [${priority.prio}] Awaiting a tab with initial priority. ${priority.firstName}`);
         const [value, release] = await PuppetMaster.semaphore.acquire(priority);
         const perf_work = performance.now();
-        logger.debug(`Semaphore acquired with ${value}`);
+        logger.debug(`[${priority.topicId}] [${priority.prio}] Semaphore acquired with ${value}`);
         try {
             return await PuppetMaster.print(pdfFilePath, urlPath);
         } catch(e) {
             throw e;
         } finally {
-            logger.debug(`Removing self from priorities. ${priority.firstName}`);
+            logger.debug(`[${priority.topicId}] Removing self [${priority.prio}] from priorities. ${priority.firstName}`);
 
             _.pull(cheatingInMemoryStorage[priority.topicId].pendingPriorities, priority);
 
             const nextPendingPromise = cheatingInMemoryStorage[priority.topicId].pendingPriorities.first;
             
             if (!_.isNil(nextPendingPromise) && priority.prio > 0) {
-                logger.debug(`Updating a priority from ${nextPendingPromise.prio} to ${priority.prio - 1} for ${nextPendingPromise.firstName}.`);
+                logger.debug(`[${priority.topicId}] Updating a priority from ${nextPendingPromise.prio} to ${priority.prio - 1} for ${nextPendingPromise.firstName}.`);
                 nextPendingPromise.prio = priority.prio - 1;
                 globalHeapManager.heapify();
             }
 
             release();
             const perf_done = performance.now();
-            logger.info(`Released semaphore. Total time: ${((perf_done - perf_wait) / 1000).toFixed(1)} seconds / Printing time: ${((perf_done - perf_work) / 1000).toFixed(1)}`);
+            logger.info(`[${priority.topicId}] [${priority.prio}] ${priority.firstName} Released semaphore. Total time: ${((perf_done - perf_wait) / 1000).toFixed(1)} seconds / Printing time: ${((perf_done - perf_work) / 1000).toFixed(1)}`);
         }
     }
     

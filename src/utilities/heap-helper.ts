@@ -1,5 +1,4 @@
 import TinyQueue from "tinyqueue";
-import logger from "./logger";
 
 export default class HeapHelper<T> {
     constructor(private _queue: TinyQueue<T>, private _comparator: (a: T, b: T) => number) {
@@ -7,6 +6,14 @@ export default class HeapHelper<T> {
     }
 
     pop = (): T | undefined => this._queue.pop();
+
+    // This is just for debugging.
+    // pop = (): T | undefined => {
+    //     const p = this._queue.pop();
+    //     if (!p) return;
+    //     logger.info(`[${(p as unknown as QueueEntry<PDFPriorityData>).data.topicId}] popped with priority [${(p as unknown as QueueEntry<PDFPriorityData>).data.prio}] ${(p as unknown as QueueEntry<PDFPriorityData>).data.firstName}`);
+    //     return p;
+    // }
 
     push = (...items: T[]): number => {
         for (const item of items) {
@@ -38,7 +45,6 @@ export default class HeapHelper<T> {
 
     // This is the only function specific to the Bulk Exporter.
     heapify = () => {
-        logger.debug('Heapifying!');
         this._queue = new TinyQueue(this._queue.data, this._comparator);
     }
 }

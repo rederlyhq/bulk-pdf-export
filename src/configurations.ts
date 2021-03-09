@@ -155,7 +155,7 @@ const configurations = {
         url: readStringValue('RENDERER_URL', rederlyURL),
     },
     puppeteer: {
-        tabSemaphoreTimeout: readIntValue('NAVIGATION_TIMEOUT', 3600000),
+        tabSemaphoreTimeout: readIntValue('TAB_SEMAPHORE_TIMEOUT', 3600000),
         navigationTimeout: readIntValue('NAVIGATION_TIMEOUT', 300000),
         resourceTimeout: readIntValue('RESOURCE_TIMEOUT', 30000),
         extraTimeout: readIntValue('EXTRA_TIMEOUT', 5000),
