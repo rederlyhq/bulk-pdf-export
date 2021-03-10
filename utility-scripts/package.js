@@ -14,6 +14,7 @@ const {
     REDERLY_PACKAGER_ARCHIVE_TAR = null,
     REDERLY_PACKAGER_DEST_FILE = null,
     REDERLY_PACKAGER_PRESERVE_NODE_MODULES = null,
+    REDERLY_PACKAGER_PRUNE_DEPENDENCIES = null
 } = process.env;
 
 console.log(`Env: ${JSON.stringify({
@@ -21,7 +22,8 @@ console.log(`Env: ${JSON.stringify({
     REDERLY_PACKAGER_ARCHIVE_ZIP,
     REDERLY_PACKAGER_ARCHIVE_TAR,
     REDERLY_PACKAGER_DEST_FILE,
-    REDERLY_PACKAGER_PRESERVE_NODE_MODULES
+    REDERLY_PACKAGER_PRESERVE_NODE_MODULES,
+    REDERLY_PACKAGER_PRUNE_DEPENDENCIES
 }, null, 2)}`);
 
 const destFile = process.argv[2] || REDERLY_PACKAGER_DEST_FILE || 'dist';
@@ -86,20 +88,22 @@ console.log(`Starting to package project into ${destFile}`);
 
     await Promise.all(copyFilePromises);
 
-    console.log('Pruning dependencies');
-    await new Promise((resolve, reject) => {
-        childProcess.exec('npm prune --production', {
-            cwd: buildDir
-        }, (error, out, err) => {
-            console.log(`Prune out: ${out}`);
-            console.error(`Prune err: ${err}`);
-            if (error) {
-                reject(error);
-            } else {
-                resolve();
-            }
-        });
-    });
+    if (REDERLY_PACKAGER_PRUNE_DEPENDENCIES !== 'false') {
+        console.log('Pruning dependencies');
+        await new Promise((resolve, reject) => {
+            childProcess.exec('npm prune --production', {
+                cwd: buildDir
+            }, (error, out, err) => {
+                console.log(`Prune out: ${out}`);
+                console.error(`Prune err: ${err}`);
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve();
+                }
+            });
+        });    
+    }
 
     const distDirectory = 'package-outputs';
     if (await fs.pathExists(distDirectory)) {

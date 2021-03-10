@@ -14,7 +14,6 @@ import router from './routes';
 import './utilities/array-extension';
 import './utilities/NumberExtensions';
 import './utilities/global-error-handlers';
-import utilities from './routes/utility-route';
 
 const { server } = configurations;
 
@@ -119,10 +118,7 @@ app.use(express.urlencoded({ limit: '50mb' }));
 
 app.use(express.json({ limit: '50mb' }));
 
-app.use('/export', express.static(configurations.server.tempDirectory));
-
 app.use(server.basePath, router);
-app.use('/utility', utilities);
 
 // General Handler
 // next is a required parameter, without having it requests result in a response of object
