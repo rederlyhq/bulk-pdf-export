@@ -9,6 +9,18 @@ import configurations from '../configurations';
 import { cheatingInMemoryStorage, globalTopicSemaphore, PDFPriorityData } from '../globals';
 import { MakePDFRequestOptions } from './interfaces';
 import Boom from 'boom';
+import utilities from './utility-route';
+
+router.use('/tmp', express.static(configurations.server.tempDirectory));
+// explicitly has to be development, otherwise you don't get this feature
+if (configurations.app.isDevelopment) {
+    try {
+        router.use('/tmp', require('serve-index')(configurations.server.tempDirectory));
+    } catch (e) {
+        logger.error('Failed to import dev dependency serve-index. This is probably because NODE_ENV is not set for production but dependencies were pruned for prod', e);
+    }
+}
+router.use('/utility', utilities);
 
 // This route generates the PDF from a MakePDFRequestOptions object.
 router.post('/', async (req, _res, next) => {

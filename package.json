@@ -8,7 +8,7 @@
     "start:watch": "nodemon src/app-scripts/index.ts",
     "start:debug": "node --inspect=5857 -r ts-node/register src/app-scripts/index.ts",
     "start:debug:watch": "nodemon --inspect=5857 src/app-scripts/index.ts",
-    "start:docker": "docker run --add-host host.docker.internal:host-gateway --cap-add=SYS_ADMIN -p 3005:3005 --name=dev-bulk-pdf-export --rm -it $(docker build -q .)",
+    "start:docker": "docker run --add-host host.docker.internal:host-gateway --cap-add=SYS_ADMIN -p 3005:3005 --name=dev-bulk-pdf-export --rm -it $(docker build --build-arg REDERLY_PACKAGER_PRUNE_DEPENDENCIES=false -q .)",
     "build": "npm run clean && tsc",
     "clean": "if [ -d ts-built ]; then rm -r ts-built; fi;",
     "lint": "eslint src/ --ext .ts",
@@ -49,6 +49,7 @@
     "pug": "^3.0.2",
     "puppeteer-core": "^5.5.0",
     "tinyqueue": "^2.0.3",
+    "url-join": "^4.0.1",
     "winston": "^3.3.3"
   },
   "devDependencies": {
@@ -63,12 +64,14 @@
     "@types/pug": "^2.0.4",
     "@types/puppeteer": "^5.4.2",
     "@types/puppeteer-core": "^5.4.0",
+    "@types/url-join": "^4.0.0",
     "@types/winston": "^2.4.4",
     "@typescript-eslint/eslint-plugin": "^4.13.0",
     "@typescript-eslint/parser": "^4.13.0",
     "acorn": "^8.0.4",
     "eslint": "^7.17.0",
     "nodemon": "^2.0.7",
+    "serve-index": "^1.9.1",
     "ts-node": "^9.1.1",
     "typescript": "^4.1.3"
   }

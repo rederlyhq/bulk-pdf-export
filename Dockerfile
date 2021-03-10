@@ -10,8 +10,10 @@ RUN npm install --silent
 # Seems like this would be a problem if you already locally had node modules
 COPY . ./
 
+ARG REDERLY_PACKAGER_PRUNE_DEPENDENCIES=true
+
 # Builds and creates the package, does not create an archive
-RUN REDERLY_PACKAGER_ARCHIVE=false npm run build:package
+RUN REDERLY_PACKAGER_ARCHIVE=false REDERLY_PACKAGER_PRUNE_DEPENDENCIES=$REDERLY_PACKAGER_PRUNE_DEPENDENCIES npm run build:package
 
 # https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#running-puppeteer-in-docker
 FROM node:lts-buster

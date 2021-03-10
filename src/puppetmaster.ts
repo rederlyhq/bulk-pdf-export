@@ -6,6 +6,7 @@ import logger from './utilities/logger';
 import { performance } from 'perf_hooks';
 import path = require('path');
 import { PDFPriorityData, cheatingInMemoryStorage, globalHeapManager } from './globals';
+import urljoin from 'url-join';
 
 /**
  * An important part of the PDF generation is waiting for the HTML page to finish loading all content.
@@ -93,7 +94,7 @@ export default class PuppetMaster {
 
         logger.debug(`Navigating to ${urlPath}.html`);
         // The Express server statically hosts the tmp files.
-        await page.goto(`http://127.0.0.1:${configurations.server.port}/export/${urlPath}`, {waitUntil: ['load', 'networkidle0'], timeout: configurations.puppeteer.navigationTimeout});
+        await page.goto(urljoin(`http://127.0.0.1:${configurations.server.port}/`, configurations.server.basePath, `/tmp/${urlPath}`), {waitUntil: ['load', 'networkidle0'], timeout: configurations.puppeteer.navigationTimeout});
         
         logger.debug('Injecting MathJax Promises.');
         const resourcePromise = page.evaluate(()=>{
