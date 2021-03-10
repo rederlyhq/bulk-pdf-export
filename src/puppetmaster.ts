@@ -1,10 +1,11 @@
 import { Semaphore, withTimeout } from 'async-mutex';
-import _ = require('lodash');
-import * as puppeteer from 'puppeteer-core';
+import _  from 'lodash';
+import puppeteer from 'puppeteer-core';
 import configurations from './configurations';
 import logger from './utilities/logger';
 import { performance } from 'perf_hooks';
 import path = require('path');
+import { PDFPriorityData, cheatingInMemoryStorage, globalHeapManager } from './globals';
 
 /**
  * An important part of the PDF generation is waiting for the HTML page to finish loading all content.
@@ -12,7 +13,12 @@ import path = require('path');
  */
 
 export default class PuppetMaster {
-    static semaphore = withTimeout(new Semaphore(configurations.app.concurrentPuppeteerTabs), 600000);
+    static semaphore = withTimeout<PDFPriorityData>(
+        new Semaphore<PDFPriorityData>(
+            configurations.app.concurrentPuppeteerTabs, new Error('Request was cancelled.'), globalHeapManager
+        ), 
+        configurations.puppeteer.tabSemaphoreTimeout
+    );
 
     static browser: Promise<puppeteer.Browser> = puppeteer.launch({
         executablePath: 'google-chrome-stable'
@@ -26,22 +32,55 @@ export default class PuppetMaster {
         }
     }
 
-    static async safePrint(pdfFilePath: string, urlPath: string) {
+    static async safePrint(pdfFilePath: string, urlPath: string, priority: PDFPriorityData) {
         const perf_wait = performance.now();
-        const [value, release] = await PuppetMaster.semaphore.acquire();
+        logger.debug(`[${priority.topicId}] [${priority.prio}] Awaiting a tab with initial priority. ${priority.firstName}`);
+        const [value, release] = await PuppetMaster.semaphore.acquire(priority);
         const perf_work = performance.now();
-        logger.debug(`Semaphore acquired with ${value}`);
+        logger.debug(`[${priority.topicId}] [${priority.prio}] Semaphore acquired with ${value}`);
         try {
             return await PuppetMaster.print(pdfFilePath, urlPath);
         } catch(e) {
             throw e;
         } finally {
+            logger.debug(`[${priority.topicId}] Removing self [${priority.prio}] from priorities. ${priority.firstName}`);
+
+            _.pull(cheatingInMemoryStorage[priority.topicId].pendingPriorities, priority);
+
+            const nextPendingPromise = cheatingInMemoryStorage[priority.topicId].pendingPriorities.first;
+            
+            if (!_.isNil(nextPendingPromise) && priority.prio > 0) {
+                logger.debug(`[${priority.topicId}] Updating a priority from ${nextPendingPromise.prio} to ${priority.prio - 1} for ${nextPendingPromise.firstName}.`);
+                nextPendingPromise.prio = priority.prio - 1;
+                globalHeapManager.heapify();
+            }
+
             release();
             const perf_done = performance.now();
-            logger.info(`Released semaphore. Total time: ${((perf_done - perf_wait) / 1000).toFixed(1)} seconds / Printing time: ${((perf_done - perf_work) / 1000).toFixed(1)}`);
+            logger.info(`[${priority.topicId}] [${priority.prio}] ${priority.firstName} Released semaphore. Total time: ${((perf_done - perf_wait) / 1000).toFixed(1)} seconds / Printing time: ${((perf_done - perf_work) / 1000).toFixed(1)}`);
         }
     }
     
+    static attachPageListeners = (page: puppeteer.Page) => {
+        if (configurations.puppeteer.logFromPage) {
+            page.on('console', message => {
+                const type = message.type();
+                const text = message.text();
+
+                if (type === 'error') {
+                    logger.error(`From Page - ${text}`);
+                } else if (type === 'warning') {
+                    logger.warn(`From Page - ${text}`);
+                } else if (text.startsWith('HEIC') || text.startsWith('PDF')) {
+                    logger.debug(`From Page - ${text}`);
+                }
+            })
+            .on('pageerror', ({ message }) => logger.error(message))
+            // .on('response', response => logger.debug(`${response.status()} ${response.url()}`))
+            .on('requestfailed', request => logger.error(`${request.failure()?.errorText} ${request.url()}`))
+        }
+    }
+
     static async print(pdfFilePath: string, urlPath: string) {
         const browser = await PuppetMaster.browser;
         if (!browser) throw new Error('No browser instance available.');
@@ -50,15 +89,7 @@ export default class PuppetMaster {
         const page = await browser.newPage();
 
         logger.debug('Attaching console listeners.');
-        page
-            .on('console', message => {
-                if (message.type() === 'error' || message.type() === 'warning') {
-                    logger.error(`${message.type().substr(0, 3).toUpperCase()} ${message.text()}`);
-                }
-            })
-            .on('pageerror', ({ message }) => logger.error(message))
-            // .on('response', response => logger.debug(`${response.status()} ${response.url()}`))
-            .on('requestfailed', request => logger.error(`${request.failure()?.errorText} ${request.url()}`))
+        PuppetMaster.attachPageListeners(page);
 
         logger.debug(`Navigating to ${urlPath}.html`);
         // The Express server statically hosts the tmp files.

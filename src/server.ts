@@ -1,10 +1,10 @@
 // TODO move common middleware to module so it can be shared with rederly backend
 
-import * as express from 'express';
+import express from 'express';
 import { Request, Response, NextFunction } from 'express';
 import * as nodeUrl from 'url';
-import * as Boom from 'boom';
-import * as morgan from 'morgan';
+import Boom from 'boom';
+import morgan from 'morgan';
 import * as _ from 'lodash';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 

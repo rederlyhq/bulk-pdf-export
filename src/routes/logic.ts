@@ -1,18 +1,17 @@
-import _ = require('lodash');
+import _ from 'lodash';
 import logger from '../utilities/logger';
 import * as pug from 'pug';
-import * as fs from 'fs-extra';
+import {writeFile, unlink, mkdirp, createReadStream, existsSync, remove } from 'fs-extra';
 import PuppetMaster from '../puppetmaster';
 import S3Helper from '../utilities/s3-helper';
-import * as archiver from 'archiver';
+import archiver from 'archiver';
 import { _Object } from '@aws-sdk/client-s3';
 import axios, { AxiosResponse } from 'axios';
 import configurations from '../configurations';
-import { GetExportArchiveOptions, MakePDFRequestOptions, ZipObject } from '.';
 import CreatePDFError from '../utilities/CreatePDFError';
 import path = require('path');
-
-const writeFile = fs.promises.writeFile;
+import { PDFPriorityData, ZipObject } from '../globals';
+import { MakePDFRequestOptions, GetExportArchiveOptions } from './interfaces';
 
 const tempBaseDirectory = `${configurations.server.tempDirectory}/`;
 const topicTempDirectory = (topicId: number) => `${tempBaseDirectory}${topicId}`;
@@ -22,7 +21,7 @@ const awsTopicKey = (professorUUID: string, topicId: number) => `exports/${profe
 const awsPDFKey = (professorUUID: string, topicId: number, fileBasename: string, addSolutionsToFilename: boolean) => `exports/${professorUUID}/${topicId}/${fileBasename}${addSolutionsToFilename ? '-solutions': ''}.pdf`;
 const awsZipKey = (professorUUID: string, topicId: number, addSolutionsToFilename: boolean) => `${awsTopicKey(professorUUID, topicId)}${topicId}_${Date.now()}${addSolutionsToFilename ? '-solutions' : ''}.zip`;
 
-export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSolutionToFilename: boolean) => {
+export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSolutionToFilename: boolean, priority: PDFPriorityData) => {
     const {firstName, lastName, topic: {name, id: topicId}, problems, professorUUID} = body;
     logger.info(`Got request to export ${firstName}'s topic with ${problems.length} problems.`);
 
@@ -39,21 +38,21 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSoluti
             legalScore: prob.legalScore?.toPercentString(),
         })).value();
 
-        await fs.mkdirp(path.dirname(htmlFilepath));
+        await mkdirp(path.dirname(htmlFilepath));
         await writeFile(htmlFilepath, f({
             firstName, lastName, topicTitle: name, problems: prettyProblems
         }), 'utf8');
 
         logger.debug(`Wrote '${htmlFilepath}'`);
 
-        const buffer = await PuppetMaster.safePrint(pdfTempFile(topicId, baseFilename), encodeURIComponent(htmlFilepath.substring(tempBaseDirectory.length)));
+        const buffer = await PuppetMaster.safePrint(pdfTempFile(topicId, baseFilename), encodeURIComponent(htmlFilepath.substring(tempBaseDirectory.length)), priority);
 
-        fs.promises.unlink(htmlFilepath)
+        unlink(htmlFilepath)
         .then(() => logger.debug(`Successfully unlinked ${htmlFilepath}`)).catch(logger.error);
         
         if (_.isNil(buffer) || _.isEmpty(buffer)) {
             logger.error(`Failed to print ${baseFilename}`);
-            return;
+            throw new Error(`Failed to print ${baseFilename}, buffer came back empty.`);
         }
 
         logger.debug(`Got PDF data of size: ${buffer.length}`);
@@ -71,7 +70,7 @@ export const createZip = (topicId: number, professorUUID: string, addSolutionsTo
 
     // Listen for archiving errors.
     archive.on('error', error => {logger.error('Archiver error', error); postBackErrorOrResultToBackend(topicId);});
-    archive.on('progress', progress => logger.debug(`...${progress.entries.processed}/${progress.entries.total}`));
+    archive.on('progress', progress => logger.debug(`[${topicId}] ...${progress.entries.processed}/${progress.entries.total}`));
     archive.on('warning', warning => logger.debug('Archiver warning: ' + warning));
     archive.on('end', () => logger.debug('End archive'));
     archive.on('close', () => logger.debug('Closing archive'));
@@ -100,16 +99,16 @@ export const addPDFToZip = async (archive: archiver.Archiver, pdfPromise: Promis
         const baseFilename = await pdfPromise;
 
         if (_.isNil(baseFilename)) {
-            logger.warn('Got a rejected promise while zipping.');
+            logger.warn(`[${topicId}] Got a rejected promise while zipping.`);
             return;
         }
 
         const pdfFilepath = pdfTempFile(topicId, baseFilename);
-        logger.debug(`Appended ${pdfFilepath} to zip.`)
-        const pdfReadStream = fs.createReadStream(pdfFilepath);
+        logger.debug(`[${topicId}] Appended ${pdfFilepath} to zip.`)
+        const pdfReadStream = createReadStream(pdfFilepath);
         pdfReadStream.on('error', (error: unknown) => logger.error('Erroring reading pdf', error));
         pdfReadStream.on('close', () => {
-            fs.promises.unlink(pdfFilepath)
+            unlink(pdfFilepath)
             .then(() => logger.debug('Deleted pdf after adding to zip'))
             .catch(e => logger.error('Unable to delete pdf after adding to zip', e));    
         });
@@ -150,8 +149,8 @@ export const finalizeZip = async (zipObject: ZipObject, query: GetExportArchiveO
 
 export const postBackErrorOrResultToBackend = async (topicId: number, exportUrl?: string): Promise<AxiosResponse> => {
     const topicTempDirectoryPath = topicTempDirectory(topicId);
-    if (fs.existsSync(topicTempDirectoryPath)) {
-        fs.remove(topicTempDirectoryPath)
+    if (existsSync(topicTempDirectoryPath)) {
+        remove(topicTempDirectoryPath)
         .then(() => logger.debug('postBackErrorOrResultToBackend: deleted tmp directory'))
         .catch((e) => logger.error(`postBackErrorOrResultToBackend: could not delete temp directory ${topicTempDirectoryPath}`, e));    
     } else {
