@@ -116,6 +116,7 @@ const configurations = {
         concurrentPuppeteerTabs: readIntValue('CONCURRENT_PUPPETEER_TABS', 5),
         highPriorityTabsPerTopic: readIntValue('HIGH_PRIORITY_TABS_PER_TOPIC', 1),
         concurrentTopicsLimit: readIntValue('CONCURRENT_TOPICS_LIMIT', 5),
+        topicsLimitTimeout: readIntValue('TOPICS_LIMIT_TIMEOUT', 86400000),
         configSalt: readStringValue('CONFIG_SALT', ''),
         rederlyURL: rederlyURL,
         attachmentsBaseURL: readStringValue('ATTACHMENTS_BASE_URL', rederlyURL),
@@ -155,7 +156,7 @@ const configurations = {
         url: readStringValue('RENDERER_URL', rederlyURL),
     },
     puppeteer: {
-        tabSemaphoreTimeout: readIntValue('TAB_SEMAPHORE_TIMEOUT', 3600000),
+        tabSemaphoreTimeout: readIntValue('TAB_SEMAPHORE_TIMEOUT', 86400000),
         navigationTimeout: readIntValue('NAVIGATION_TIMEOUT', 300000),
         resourceTimeout: readIntValue('RESOURCE_TIMEOUT', 30000),
         extraTimeout: readIntValue('EXTRA_TIMEOUT', 5000),

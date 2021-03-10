@@ -8,6 +8,7 @@ import { addPDFToZip, createPDFFromSrcdoc, createZip, finalizeZip, postBackError
 import configurations from '../configurations';
 import { cheatingInMemoryStorage, globalTopicSemaphore, PDFPriorityData } from '../globals';
 import { MakePDFRequestOptions } from './interfaces';
+import Boom from 'boom';
 
 // This route generates the PDF from a MakePDFRequestOptions object.
 router.post('/', async (req, _res, next) => {
@@ -34,14 +35,20 @@ router.post('/', async (req, _res, next) => {
         cheatingInMemoryStorage[topic].lock = globalTopicSemaphore.acquire();
     }
 
-    await cheatingInMemoryStorage[topic].lock;
+    try {
+        await cheatingInMemoryStorage[topic].lock;
+    } catch (e) {
+        logger.error(`[${topic}] Too many topics ${Object.keys(cheatingInMemoryStorage).length} active for ${configurations.app.concurrentTopicsLimit}`);
+        // We don't need to push failed promises to the array because all printing attempts will fail at this point.
+        return;
+    }
 
     const newPriority: PDFPriorityData = { prio: 0, topicId: topic, profUUID: body.professorUUID, firstName: body.firstName };
 
     // If this is one of the first N PDFs, give elevated priority.
     if (cheatingInMemoryStorage[topic].pdfPromises.length < configurations.app.highPriorityTabsPerTopic) {
-        logger.debug(`[${topic}] Assigning an initial high priority of 99 to ${body.firstName}`);
-        newPriority.prio = 99;
+        newPriority.prio = 999999;
+        logger.debug(`[${topic}] Assigning an initial high priority of ${newPriority.prio} to ${body.firstName}`);
     }
 
     cheatingInMemoryStorage[topic].pendingPriorities.push(newPriority);
@@ -61,12 +68,12 @@ router.get('/', async (_req, _res, next) => {
 
     if (_.isNil(topicIdStr) || typeof topicIdStr !== 'string') {
         logger.error('Bad topic id. ' + topicIdStr);
-        return;
+        return next(Boom.badRequest('Bad topic id.'));
     }
 
     if (typeof profUUID !== 'string') {
         logger.error('Bad UUID. ' + profUUID);
-        return;
+        return next(Boom.badRequest('Bad UUID.'));
     }
 
     let addSolutionToFilename = false;
@@ -83,17 +90,28 @@ router.get('/', async (_req, _res, next) => {
     // If the topic doesn't have a lock yet, acquire one! Then, wait for that lock before processing.
     if (_.isNil(cheatingInMemoryStorage[topicId].lock)) {
         logger.error(`Zip called, but the topic ${topicId} hasn't created a request for a lock yet.`)
-        throw new Error('Zip called too soon.');
+        return await postBackErrorOrResultToBackend(topicId);
     }
-    logger.info(`Acquiring a lock to print topic ${topicId}`);
-    const [, release] = await cheatingInMemoryStorage[topicId].lock;
+
+    let release;
+    try {
+        logger.info(`Acquiring a lock to print topic ${topicId}`);
+        [, release] = await cheatingInMemoryStorage[topicId].lock;
+    } catch (e) {
+        logger.error('Zip was requested before any PDFs were!', e);
+        return await postBackErrorOrResultToBackend(topicId);
+    }
 
     try {
+        if (_.isEmpty(cheatingInMemoryStorage[topicId].pdfPromises)) {
+            throw new Error('Zip was requested before any PDFs were!');
+        }
+
         // Wait for all previous PDF generations for this topic to finish.
         await Promise.allSettled(cheatingInMemoryStorage[topicId].pdfPromises);
     } catch (e) {
-        logger.error('Zip was requested before any PDFs were!', e);
-        throw new Error('Zip called too soon.');
+        logger.error(`[${topicId}] An error occured waiting for PDF promises to settle.`, e);
+        return await postBackErrorOrResultToBackend(topicId);
     }
 
     try {

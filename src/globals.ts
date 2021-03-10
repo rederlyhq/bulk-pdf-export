@@ -1,7 +1,7 @@
 import { ServiceOutputTypes } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import archiver from "archiver";
-import { Semaphore, SemaphoreInterface } from "async-mutex";
+import { Semaphore, SemaphoreInterface, withTimeout } from "async-mutex";
 import { QueueEntry } from "async-mutex";
 import TinyQueue from "tinyqueue";
 import configurations from "./configurations";
@@ -33,7 +33,7 @@ export const cheatingInMemoryStorage: {
 } = {}
 
 // This limits how many Topics can be processed simultaneously.
-export const globalTopicSemaphore = new Semaphore(configurations.app.concurrentTopicsLimit);
+export const globalTopicSemaphore = withTimeout(new Semaphore(configurations.app.concurrentTopicsLimit), configurations.app.topicsLimitTimeout);
 
 // This manages the heap of all pendingPromises from cheatingInMemoryStorage (across all topics).
 export const globalHeapManager = new HeapHelper<QueueEntry<PDFPriorityData>>(new TinyQueue(), (a, b) => b.data.prio - a.data.prio);
