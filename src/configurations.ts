@@ -131,6 +131,7 @@ const configurations = {
         logAccessSlowRequestThreshold: readIntValue('SERVER_LOG_ACCESS_SLOW_REQUEST_THRESHOLD', 30000),
         requestTimeout: readIntValue('SERVER_REQUEST_TIMEOUT', 150000),
         tempDirectory: readStringValue('SERVER_TEMP_DIRECTORY', 'tmp'),
+        autoDeleteTemp: readBooleanValue('SERVER_AUTO_DELETE_TEMP', true),
         // limiter: {
         //     windowLength: readIntValue('SERVER_LIMITER_WINDOW_LENGTH', 60000),
         //     maxRequests: readIntValue('SERVER_LIMITER_MAX_REQUESTS', 100),
@@ -185,6 +186,10 @@ const configurations = {
                 return reject(new Error(`Missing configurations:\n${logs?.join('\n') ?? 'Logs are null'}`));
             } else {
                 resolve();
+            }
+
+            if (isProduction && !configurations.server.autoDeleteTemp) {
+                logger.warning('In production but not deleteing temp files')
             }
             // After we log the warnings we can drop the logs, figured it would cause cleanup
             logs = null;

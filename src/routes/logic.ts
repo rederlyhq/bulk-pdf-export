@@ -47,8 +47,10 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSoluti
 
         const buffer = await PuppetMaster.safePrint(pdfTempFile(topicId, baseFilename), encodeURIComponent(htmlFilepath.substring(tempBaseDirectory.length)), priority);
 
-        unlink(htmlFilepath)
-        .then(() => logger.debug(`Successfully unlinked ${htmlFilepath}`)).catch(logger.error);
+        if (configurations.server.autoDeleteTemp) {
+            unlink(htmlFilepath)
+            .then(() => logger.debug(`Successfully unlinked ${htmlFilepath}`)).catch(logger.error);    
+        }
         
         if (_.isNil(buffer) || _.isEmpty(buffer)) {
             logger.error(`Failed to print ${baseFilename}`);
@@ -108,9 +110,11 @@ export const addPDFToZip = async (archive: archiver.Archiver, pdfPromise: Promis
         const pdfReadStream = createReadStream(pdfFilepath);
         pdfReadStream.on('error', (error: unknown) => logger.error('Erroring reading pdf', error));
         pdfReadStream.on('close', () => {
-            unlink(pdfFilepath)
-            .then(() => logger.debug('Deleted pdf after adding to zip'))
-            .catch(e => logger.error('Unable to delete pdf after adding to zip', e));    
+            if (configurations.server.autoDeleteTemp) {
+                unlink(pdfFilepath)
+                .then(() => logger.debug('Deleted pdf after adding to zip'))
+                .catch(e => logger.error('Unable to delete pdf after adding to zip', e));    
+            }
         });
         archive.append(pdfReadStream, { name: path.basename(pdfFilepath) });
     } catch (e) {
@@ -148,13 +152,15 @@ export const finalizeZip = async (zipObject: ZipObject, query: GetExportArchiveO
 };
 
 export const postBackErrorOrResultToBackend = async (topicId: number, exportUrl?: string): Promise<AxiosResponse> => {
-    const topicTempDirectoryPath = topicTempDirectory(topicId);
-    if (existsSync(topicTempDirectoryPath)) {
-        remove(topicTempDirectoryPath)
-        .then(() => logger.debug('postBackErrorOrResultToBackend: deleted tmp directory'))
-        .catch((e) => logger.error(`postBackErrorOrResultToBackend: could not delete temp directory ${topicTempDirectoryPath}`, e));    
-    } else {
-        logger.warn(`postBackErrorOrResultToBackend: tried to delete temp directory but it did not exist "${topicTempDirectoryPath}"`);
+    if (configurations.server.autoDeleteTemp) {
+        const topicTempDirectoryPath = topicTempDirectory(topicId);
+        if (existsSync(topicTempDirectoryPath)) {
+            remove(topicTempDirectoryPath)
+            .then(() => logger.debug('postBackErrorOrResultToBackend: deleted tmp directory'))
+            .catch((e) => logger.error(`postBackErrorOrResultToBackend: could not delete temp directory ${topicTempDirectoryPath}`, e));    
+        } else {
+            logger.warn(`postBackErrorOrResultToBackend: tried to delete temp directory but it did not exist "${topicTempDirectoryPath}"`);
+        }    
     }
 
     return await axios.put(`${configurations.backend.url}/backend-api/courses/topic/${topicId}/endExport`, {
