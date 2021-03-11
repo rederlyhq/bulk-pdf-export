@@ -4,6 +4,7 @@ import { Request, Response, NextFunction, Handler } from 'express';
 import httpResponse from '../utilities/http-response';
 import logger from '../utilities/logger';
 import * as crypto from 'crypto';
+import Boom from 'boom';
 
 // https://www.reddit.com/r/typescript/comments/f91zlt/how_do_i_check_that_a_caught_error_matches_a/
 export function isAxiosError(error: any): error is AxiosError {
@@ -93,13 +94,28 @@ interface StatusHandlerOptions {
     healthAccessibleOptions?: CheckAccessibleOptions[];
     customChecks?: CustomCheckOptions[];
 }
+
+let alreadyCrawling = false;
 export const statusHandler = ({
     versionPromise = Promise.resolve(null),
     statusAccessibleOptions = [],
     healthAccessibleOptions = [],
     customChecks = []
 }: StatusHandlerOptions): Handler => async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    const crawling = req.query.crawl === 'true';
     try {
+        let statusPromises: Promise<DependencyObject>[] = [];
+        let healthPromises: Promise<DependencyObject>[] = [];
+        if (crawling) {
+            if (alreadyCrawling) {
+                next(Boom.tooManyRequests('Cannot crawl while already crawling'));
+                return;
+            }
+            alreadyCrawling = true;
+            statusPromises = statusAccessibleOptions.map(statusAccessibleOption => checkAccessible(statusAccessibleOption));
+            healthPromises = healthAccessibleOptions.map(healthAccessibleOption => checkAccessible(healthAccessibleOption));
+        }
+
         const version = await versionPromise;
         const responseData: StatusResponse = {
             version: version,
@@ -107,12 +123,6 @@ export const statusHandler = ({
             percentUp: 0
         };
 
-        let statusPromises: Promise<DependencyObject>[] = [];
-        let healthPromises: Promise<DependencyObject>[] = [];
-        if (req.query.crawl === 'true') {
-            statusPromises = statusAccessibleOptions.map(statusAccessibleOption => checkAccessible(statusAccessibleOption));
-            healthPromises = healthAccessibleOptions.map(healthAccessibleOption => checkAccessible(healthAccessibleOption));
-        }
         const customPromises = customChecks.map(customCheck => customCheck.call());
 
         const statusResults = await Promise.all(statusPromises);
@@ -147,8 +157,13 @@ export const statusHandler = ({
         responseData.percentUp = (upCount + 1) / (allResults.length + 1);
 
         allResults.forEach(result => responseData.dependencies.push(result));
+
         next(httpResponse.Ok('Fetched successfully', responseData));
     } catch (e) {
         next(e);
+    } finally {
+        if (crawling) {
+            alreadyCrawling = false;
+        }
     }
 };
