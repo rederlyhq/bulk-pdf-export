@@ -72,7 +72,7 @@ router.post('/', async (req, _res, next) => {
     cheatingInMemoryStorage[topic].pdfPromises.push(pdfPromise);
 
     try {
-        addPDFToZip(cheatingInMemoryStorage[topic].zipObject.archive, pdfPromise, topic);
+        addPDFToZip(cheatingInMemoryStorage[topic].zipObject.archive, pdfPromise, topic, addSolutionToFilename);
     } catch (e) {
         logger.error(`[${topic}] Route failed to add pdf to zip`, e);
     }

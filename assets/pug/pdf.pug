@@ -98,7 +98,11 @@ head
             //- With this fix they lazy load in; so if it times out before all resourses are done you get some
             //- return heic2any({ blob });
             const result = (async () => {
-                await currentHEICPromise;
+                try {
+                    await currentHEICPromise;
+                } catch (e) {
+                    console.warn('currentHEICPromise failed', e);
+                }
                 return heic2any({ blob });
             })();
             currentHEICPromise = result;

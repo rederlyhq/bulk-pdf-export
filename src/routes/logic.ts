@@ -16,7 +16,7 @@ import { MakePDFRequestOptions, GetExportArchiveOptions } from './interfaces';
 const tempBaseDirectory = `${configurations.server.tempDirectory}/`;
 const topicTempDirectory = (topicId: number) => `${tempBaseDirectory}${topicId}`;
 const htmlTempFile = (topicId: number, fileBasename: string) => `${topicTempDirectory(topicId)}/${fileBasename}.html`;
-const pdfTempFile = (topicId: number, fileBasename: string) => `${topicTempDirectory(topicId)}/${fileBasename}.pdf`;
+const pdfTempFile = (topicId: number, fileBasename: string, addSolutionsToFilename: boolean) => `${topicTempDirectory(topicId)}/${fileBasename}${addSolutionsToFilename ? '-solutions' : ''}.pdf`;
 const awsTopicKey = (professorUUID: string, topicId: number) => `exports/${professorUUID}/${topicId}/`;
 const awsPDFKey = (professorUUID: string, topicId: number, fileBasename: string, addSolutionsToFilename: boolean) => `exports/${professorUUID}/${topicId}/${fileBasename}${addSolutionsToFilename ? '-solutions': ''}.pdf`;
 const awsZipKey = (professorUUID: string, topicId: number, addSolutionsToFilename: boolean) => `${awsTopicKey(professorUUID, topicId)}${topicId}_${Date.now()}${addSolutionsToFilename ? '-solutions' : ''}.zip`;
@@ -45,7 +45,7 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSoluti
 
         logger.debug(`Wrote '${htmlFilepath}'`);
 
-        const buffer = await PuppetMaster.safePrint(pdfTempFile(topicId, baseFilename), encodeURIComponent(htmlFilepath.substring(tempBaseDirectory.length)), priority);
+        const buffer = await PuppetMaster.safePrint(pdfTempFile(topicId, baseFilename, addSolutionToFilename), encodeURIComponent(htmlFilepath.substring(tempBaseDirectory.length)), priority);
 
         if (configurations.server.autoDeleteTemp) {
             unlink(htmlFilepath)
@@ -96,7 +96,7 @@ export const createZip = (topicId: number, professorUUID: string, addSolutionsTo
     };
 }
 
-export const addPDFToZip = async (archive: archiver.Archiver, pdfPromise: Promise<string | undefined>, topicId: number) => {
+export const addPDFToZip = async (archive: archiver.Archiver, pdfPromise: Promise<string | undefined>, topicId: number, addSolutionToFilename: boolean) => {
     try {
         const baseFilename = await pdfPromise;
 
@@ -105,7 +105,7 @@ export const addPDFToZip = async (archive: archiver.Archiver, pdfPromise: Promis
             return;
         }
 
-        const pdfFilepath = pdfTempFile(topicId, baseFilename);
+        const pdfFilepath = pdfTempFile(topicId, baseFilename, addSolutionToFilename);
         logger.debug(`[${topicId}] Appended ${pdfFilepath} to zip.`)
         const pdfReadStream = createReadStream(pdfFilepath);
         pdfReadStream.on('error', (error: unknown) => logger.error('Erroring reading pdf', error));
