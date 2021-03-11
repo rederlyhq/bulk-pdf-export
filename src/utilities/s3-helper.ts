@@ -4,6 +4,7 @@ import configurations from '../configurations';
 import logger from './logger';
 import { Upload } from '@aws-sdk/lib-storage';
 import { createReadStream } from 'fs';
+import { performance } from 'perf_hooks';
 
 export default class S3Helper {
     static awsConfigurationObject = {
@@ -56,9 +57,9 @@ export default class S3Helper {
         pass.on('close', () => logger.debug('uploadFromStream: Piping to aws stream closed'));
         
         const uploadDonePromise = upload.done();
-        const startTime = new Date();
+        const startTime = performance.now();
         uploadDonePromise.then(() => {
-            const duration = new Date().getTime() - startTime.getTime();
+            const duration = performance.now() - startTime;
             logger.info(`uploadFromStream: uploaded to aws in ${duration} milliseconds`)
         });
 

@@ -12,14 +12,7 @@ import CreatePDFError from '../utilities/CreatePDFError';
 import path = require('path');
 import { PDFPriorityData, ZipObject } from '../globals';
 import { MakePDFRequestOptions, GetExportArchiveOptions } from './interfaces';
-
-const tempBaseDirectory = `${configurations.server.tempDirectory}/`;
-const topicTempDirectory = (topicId: number) => `${tempBaseDirectory}${topicId}`;
-const htmlTempFile = (topicId: number, fileBasename: string) => `${topicTempDirectory(topicId)}/${fileBasename}.html`;
-const pdfTempFile = (topicId: number, fileBasename: string, addSolutionsToFilename: boolean) => `${topicTempDirectory(topicId)}/${fileBasename}${addSolutionsToFilename ? '-solutions' : ''}.pdf`;
-const awsTopicKey = (professorUUID: string, topicId: number) => `exports/${professorUUID}/${topicId}/`;
-const awsPDFKey = (professorUUID: string, topicId: number, fileBasename: string, addSolutionsToFilename: boolean) => `exports/${professorUUID}/${topicId}/${fileBasename}${addSolutionsToFilename ? '-solutions': ''}.pdf`;
-const awsZipKey = (professorUUID: string, topicId: number, addSolutionsToFilename: boolean) => `${awsTopicKey(professorUUID, topicId)}${topicId}_${Date.now()}${addSolutionsToFilename ? '-solutions' : ''}.zip`;
+import { tempBaseDirectory, topicTempDirectory, htmlTempFile, pdfTempFile, awsPDFKey, awsZipKey } from '../utilities/path-helpers';
 
 export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSolutionToFilename: boolean, priority: PDFPriorityData): Promise<string> => {
     const {firstName, lastName, topic: {name, id: topicId}, problems, professorUUID} = body;
@@ -49,7 +42,8 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSoluti
 
         if (configurations.server.autoDeleteTemp) {
             unlink(htmlFilepath)
-            .then(() => logger.debug(`Successfully unlinked ${htmlFilepath}`)).catch(logger.error);    
+            .then(() => logger.debug(`Successfully unlinked ${htmlFilepath}`))
+            .catch(e => logger.error('Failed to delete temp directory', e));    
         }
         
         if (_.isNil(buffer) || _.isEmpty(buffer)) {
