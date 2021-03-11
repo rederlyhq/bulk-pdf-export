@@ -6,7 +6,7 @@ import logger from '../utilities/logger';
 import { _Object } from '@aws-sdk/client-s3';
 import { addPDFToZip, createPDFFromSrcdoc, createZip, finalizeZip, postBackErrorOrResultToBackend } from './logic';
 import configurations from '../configurations';
-import { cheatingInMemoryStorage, globalTopicSemaphore, PDFPriorityData } from '../globals';
+import { cheatingInMemoryStorage, globalTopicSemaphore, PDFPriorityData, PromiseWithStatus } from '../globals';
 import { MakePDFRequestOptions } from './interfaces';
 import Boom from 'boom';
 import utilities from './utility-route';
@@ -65,7 +65,10 @@ router.post('/', async (req, _res, next) => {
 
     cheatingInMemoryStorage[topic].pendingPriorities.push(newPriority);
 
-    const pdfPromise = createPDFFromSrcdoc(body, addSolutionToFilename, newPriority);
+    const pdfPromise: PromiseWithStatus<string> = createPDFFromSrcdoc(body, addSolutionToFilename, newPriority);
+    pdfPromise.status = 'pending';
+    pdfPromise.then(() => pdfPromise.status = 'resolved');
+    pdfPromise.catch(() => pdfPromise.status = 'rejected');
     cheatingInMemoryStorage[topic].pdfPromises.push(pdfPromise);
 
     try {
@@ -144,6 +147,25 @@ router.get('/', async (_req, _res, next) => {
         }
         delete cheatingInMemoryStorage[topicId];
     }
+});
+
+const promiseStatusCount = (promises: PromiseWithStatus<unknown>[], status: 'resolved' | 'rejected' | 'pending') => promises.reduce((currentSum, promise) => currentSum + Number(promise.status === status), 0);
+router.get('/:topicId', async (req, _res, next) => {
+    const topicId = parseInt(req.params.topicId, 10);
+    const obj = cheatingInMemoryStorage[topicId];
+    if (!obj) {
+        next(httpResponse.Ok('Fetched successfully', null));
+    }
+    const resolvedCount = promiseStatusCount(obj.pdfPromises, 'resolved');
+    const rejectedCount = promiseStatusCount(obj.pdfPromises, 'rejected');
+    const pendingCount = promiseStatusCount(obj.pdfPromises, 'pending');
+    const pdfCount = obj.pdfPromises.length;
+    next(httpResponse.Ok('Fetched successfully', {
+        resolvedCount,
+        rejectedCount,
+        pendingCount,
+        pdfCount
+    }));
 });
 
 process.on('SIGTERM', async () => {

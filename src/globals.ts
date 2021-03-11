@@ -22,10 +22,14 @@ export interface ZipObject {
     uploadDonePromise: Promise<ServiceOutputTypes>;
 }
 
+export interface PromiseWithStatus<T> extends Promise<T> {
+    status?: 'resolved' | 'rejected' | 'pending'
+}
+
 // This holds all the promises required to finish before we can zip up the topic.
 export const cheatingInMemoryStorage: {
     [topicId: number]: {
-        pdfPromises: Promise<string | undefined>[];
+        pdfPromises: PromiseWithStatus<string>[];
         pendingPriorities: PDFPriorityData[];
         zipObject: ZipObject;
         lock: Promise<[number, SemaphoreInterface.Releaser]>
