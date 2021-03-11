@@ -92,7 +92,7 @@ export default class PuppetMaster {
         logger.debug('Attaching console listeners.');
         PuppetMaster.attachPageListeners(page);
 
-        logger.debug(`Navigating to ${urlPath}.html`);
+        logger.debug(`Navigating to ${urlPath}`);
         // The Express server statically hosts the tmp files.
         await page.goto(urljoin(`http://127.0.0.1:${configurations.server.port}/`, configurations.server.basePath, `/tmp/${urlPath}`), {waitUntil: ['load', 'networkidle0'], timeout: configurations.puppeteer.navigationTimeout});
         
