@@ -7,6 +7,8 @@ import * as path from 'path';
 import logger from '../utilities/logger';
 import configurations from '../configurations';
 const packageJSONPath = '../../package.json';
+import PuppetMaster from '../puppetmaster';
+import { statusHandler } from '../middleware/status-handler';
 
 /**
  * Get the version number at startup, however you'll have to await the result in the callback
@@ -33,7 +35,7 @@ const versionPromise = new Promise<string | null>((resolve, reject) => {
     return null;
 });
 
-router.use('/version',
+router.get('/version',
 // No validation
 // No authentication
 async (_req: Request, _res: Response, next: NextFunction) => {
@@ -47,7 +49,39 @@ async (_req: Request, _res: Response, next: NextFunction) => {
     }
 });
 
-router.use('/secret-to-everyone',
+router.get('/status', statusHandler({
+    versionPromise: versionPromise,
+    customChecks: [{
+        call: async () => {
+            const puppeteerIsConnected = (await PuppetMaster.browser).isConnected()
+            return {
+                succeeded: puppeteerIsConnected,
+                response: null,
+                name: 'puppeteer'
+            }
+        },
+    }],
+    healthAccessibleOptions: [
+        // TODO change to status when available
+        {
+            name: 'renderer',
+            url: `${configurations.renderer.url}/version.txt`,
+            crawl: true
+        },
+        {
+            name: 'attachments',
+            url: `${configurations.app.attachmentsBaseURL}/work/index.txt`,
+            crawl: true
+        }
+    ],
+    statusAccessibleOptions: [{
+        name: 'backend',
+        url: `${configurations.backend.url}/backend-api/utility/status`,
+        crawl: false
+    }]
+}));
+
+router.get('/secret-to-everyone',
 // No validation
 (_req: Request, _res: Response, next: NextFunction) => {
     next(httpResponse.Ok(null, configurations.hash));
