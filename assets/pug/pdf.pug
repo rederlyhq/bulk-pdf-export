@@ -1,13 +1,13 @@
 mixin HeicImg(url, id)
-    img(id=id alt=id class='heic' src=`${url}` style={'max-width': '100% !important', 'max-height': '100% !important', 'break-before': 'page', 'break-inside': 'avoid'})
+    img.fullpageImg(id=id alt=id class='heic' src=`${url}`)
     script.
         (()=>{
             var url = "#{url}";
             var name = "#{id}";
-            console.warn('HEIC: Checking', name);
+            console.log('HEIC: Checking', name);
 
             if (!name.toLowerCase().endsWith('.heic')) return;
-            console.warn('HEIC: Starting', url);
+            console.log('HEIC: Starting', url);
             
             var heic = document.getElementById("#{id}");
 
@@ -15,11 +15,11 @@ mixin HeicImg(url, id)
                 .then((res) => res.blob())
                 .then((blob) => window.sequentialHeic2any(blob))
                 .then((conversionResult) => {
-                    console.warn('HEIC: Success!');
+                    console.log('HEIC: Success!');
                     var heicUrl = URL.createObjectURL(conversionResult);
                     heic.onload = () => {
                         // TODO downgrade to log
-                        console.warn('HEIC: LOAD EVENT SUCCESS');
+                        console.log('HEIC: LOAD EVENT SUCCESS');
                         heic.dispatchEvent(new Event('heicDone'));
                     }
                     heic.onerror = (e) => {
@@ -105,6 +105,17 @@ head
             return result;
         };
     +PdfSetupMixin
+    style(type="text/css"). 
+        .attachmentTitle {
+            break-before: page;
+        }
+
+        .fullpageImg {
+            max-width: 90% !important;
+            max-height: 90% !important;
+            break-inside: avoid;
+            object-fit: cover;
+        }
 body(width="210mm" height="297mm")
     //- TODO: Add a Rederly header
     include templates/rederly-logo.pug
@@ -127,10 +138,10 @@ body(width="210mm" height="297mm")
             h3 Could not render Problem #{problem.number}
 
         each attachment, attachmentIndex in (problem.attachments || [])
-            div #{attachment.name} (Uploaded at #{attachment.time})
+            div.attachmentTitle #{attachment.name} (Uploaded at #{attachment.time})
             if attachment.name && attachment.name.toLowerCase().endsWith('.pdf')
                 +InlinePdfMixin(attachment.url, `${problemIndex}_${attachmentIndex}_${attachment.name}`)
             else if attachment.name && attachment.name.toLowerCase().endsWith('.heic')
                 +HeicImg(attachment.url, `${problemIndex}_${attachmentIndex}_${attachment.name}`)
             else
-                img(alt=attachment.name src=attachment.url style={'max-width': '100% !important', 'max-height': '100% !important', 'break-before': 'page', 'break-inside': 'avoid'})
+                img.fullpageImg(alt=attachment.name src=attachment.url)
