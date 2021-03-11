@@ -21,7 +21,7 @@ const awsTopicKey = (professorUUID: string, topicId: number) => `exports/${profe
 const awsPDFKey = (professorUUID: string, topicId: number, fileBasename: string, addSolutionsToFilename: boolean) => `exports/${professorUUID}/${topicId}/${fileBasename}${addSolutionsToFilename ? '-solutions': ''}.pdf`;
 const awsZipKey = (professorUUID: string, topicId: number, addSolutionsToFilename: boolean) => `${awsTopicKey(professorUUID, topicId)}${topicId}_${Date.now()}${addSolutionsToFilename ? '-solutions' : ''}.zip`;
 
-export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSolutionToFilename: boolean, priority: PDFPriorityData) => {
+export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSolutionToFilename: boolean, priority: PDFPriorityData): Promise<string> => {
     const {firstName, lastName, topic: {name, id: topicId}, problems, professorUUID} = body;
     logger.info(`Got request to export ${firstName}'s topic with ${problems.length} problems.`);
 
