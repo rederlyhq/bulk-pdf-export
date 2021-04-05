@@ -7,7 +7,8 @@ import { _Object } from '@aws-sdk/client-s3';
 import { addPDFToZip, createPDFFromSrcdoc, createZip, finalizeZip, postBackErrorOrResultToBackend } from './logic';
 import configurations from '../configurations';
 import { cheatingInMemoryStorage, globalTopicSemaphore, PDFPriorityData, PromiseWithStatus } from '../globals';
-import { MakePDFRequestOptions } from './interfaces';
+import { DebugPageInfo, MakePDFRequestOptions } from './interfaces';
+import PuppetMaster from '../puppetmaster';
 import Boom from 'boom';
 import utilities from './utility-route';
 
@@ -189,9 +190,15 @@ router.get('/dumpAll', async (req, _res, next) => {
             pdfCount
         });
     }, <any[]>[]);
+
+    const metadata = {
+        pages: <DebugPageInfo>[],
+
+    };
+    metadata.pages = await PuppetMaster.getPagesArray();
     console.log(res);
     logger.debug(res);
-    next(httpResponse.Ok('Fetched successfully', res));
+    next(httpResponse.Ok('Fetched successfully', {data: res, metadata}));
 });
 
 router.get('/:topicId', async (req, _res, next) => {

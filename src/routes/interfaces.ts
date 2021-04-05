@@ -20,3 +20,10 @@ export interface GetExportArchiveOptions {
     topicId: number;
     addSolutionToFilename: boolean;
 }
+
+export interface DebugPageInfo {
+    [index: number]: {
+        url: string;
+        metrics: number;
+    }
+}
