@@ -46,9 +46,16 @@ export default class PuppetMaster {
         } finally {
             logger.debug(`[${priority.topicId}] Removing self [${priority.prio}] from priorities. ${priority.firstName}`);
 
-            _.pull(cheatingInMemoryStorage[priority.topicId].pendingPriorities, priority);
+            const topicStorageProxy = cheatingInMemoryStorage[priority.topicId];
 
-            const nextPendingPromise = cheatingInMemoryStorage[priority.topicId].pendingPriorities.first;
+            if (topicStorageProxy === undefined) {
+                logger.error('TSNH Topic Storage is not defined while a PDF is printing.');
+                throw new Error('Topic Storage is not defined while a PDF is printing.');
+            }
+
+            _.pull(topicStorageProxy.pendingPriorities, priority);
+
+            const nextPendingPromise = topicStorageProxy.pendingPriorities.first;
             
             if (!_.isNil(nextPendingPromise) && priority.prio > 0) {
                 logger.debug(`[${priority.topicId}] Updating a priority from ${nextPendingPromise.prio} to ${priority.prio - 1} for ${nextPendingPromise.firstName}.`);

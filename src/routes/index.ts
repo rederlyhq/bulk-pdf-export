@@ -33,24 +33,33 @@ router.post('/', async (req, _res, next) => {
     // Respond immediately. The work is done asynchronously below.
     next(httpResponse.Ok('Working on it!'));
     
-    cheatingInMemoryStorage[topic] = cheatingInMemoryStorage[topic] ?? {
-        pdfPromises: [],
-        zipObject: createZip(topic, body.professorUUID, addSolutionToFilename),
-        professorUUID: body.professorUUID,
-        pendingPriorities: [],
-        lock: undefined,
-    };
+    if (cheatingInMemoryStorage[topic] === undefined) {
+        cheatingInMemoryStorage[topic] = {
+            pdfPromises: <Array<PromiseWithStatus<string>>>[],
+            zipObject: createZip(topic, body.professorUUID, addSolutionToFilename),
+            professorUUID: body.professorUUID,
+            pendingPriorities: <Array<PDFPriorityData>>[],
+            lock: undefined,
+        };
+    }
+
+    const topicStorageProxy = cheatingInMemoryStorage[topic];
+
+    if (topicStorageProxy === undefined) {
+        logger.error('TSNH Topic Storage is not defined after just being defined.');
+        return;
+    }
 
     // If the topic doesn't have a lock yet, acquire one! Then, wait for that lock before processing.
-    if (_.isNil(cheatingInMemoryStorage[topic].lock)) {
+    if (_.isNil(topicStorageProxy.lock)) {
         logger.info(`Creating a lock for topic ${topic}`);
-        cheatingInMemoryStorage[topic].lock = globalTopicSemaphore.acquire();
+        topicStorageProxy.lock = globalTopicSemaphore.acquire();
     }
 
     try {
-        await cheatingInMemoryStorage[topic].lock;
+        await topicStorageProxy.lock;
     } catch (e) {
-        logger.error(`[${topic}] Too many topics ${Object.keys(cheatingInMemoryStorage).length} active for ${configurations.app.concurrentTopicsLimit}`);
+        logger.error(`[${topic}] Too many topics ${Object.keys(cheatingInMemoryStorage).length} active for ${configurations.app.concurrentTopicsLimit} (${e.message})`);
         // We don't need to push failed promises to the array because all printing attempts will fail at this point.
         return;
     }
@@ -58,21 +67,21 @@ router.post('/', async (req, _res, next) => {
     const newPriority: PDFPriorityData = { prio: 0, topicId: topic, profUUID: body.professorUUID, firstName: body.firstName };
 
     // If this is one of the first N PDFs, give elevated priority.
-    if (cheatingInMemoryStorage[topic].pdfPromises.length < configurations.app.highPriorityTabsPerTopic) {
+    if (topicStorageProxy.pdfPromises.length < configurations.app.highPriorityTabsPerTopic) {
         newPriority.prio = 999999;
         logger.debug(`[${topic}] Assigning an initial high priority of ${newPriority.prio} to ${body.firstName}`);
     }
 
-    cheatingInMemoryStorage[topic].pendingPriorities.push(newPriority);
+    topicStorageProxy.pendingPriorities.push(newPriority);
 
     const pdfPromise: PromiseWithStatus<string> = createPDFFromSrcdoc(body, addSolutionToFilename, newPriority);
     pdfPromise.status = 'pending';
     pdfPromise.then(() => pdfPromise.status = 'resolved');
     pdfPromise.catch(() => pdfPromise.status = 'rejected');
-    cheatingInMemoryStorage[topic].pdfPromises.push(pdfPromise);
+    topicStorageProxy.pdfPromises.push(pdfPromise);
 
     try {
-        addPDFToZip(cheatingInMemoryStorage[topic].zipObject.archive, pdfPromise, topic, addSolutionToFilename);
+        addPDFToZip(topicStorageProxy.zipObject.archive, pdfPromise, topic, addSolutionToFilename);
     } catch (e) {
         logger.error(`[${topic}] Route failed to add pdf to zip`, e);
     }
@@ -102,8 +111,16 @@ router.get('/', async (_req, _res, next) => {
     logger.info(`Responding to request to zip ${topicId} with OK first.`);
     next(httpResponse.Ok('Ok'));
 
+    
+    const topicStorageProxy = cheatingInMemoryStorage[topicId];
+
+    if (topicStorageProxy === undefined) {
+        logger.error('TSNH Topic Storage is not defined when zip requested.');
+        return await postBackErrorOrResultToBackend(topicId);
+    }
+
     // If the topic doesn't have a lock yet, acquire one! Then, wait for that lock before processing.
-    if (_.isNil(cheatingInMemoryStorage[topicId].lock)) {
+    if (_.isNil(topicStorageProxy.lock)) {
         logger.error(`Zip called, but the topic ${topicId} hasn't created a request for a lock yet.`)
         return await postBackErrorOrResultToBackend(topicId);
     }
@@ -111,26 +128,26 @@ router.get('/', async (_req, _res, next) => {
     let release;
     try {
         logger.info(`Acquiring a lock to print topic ${topicId}`);
-        [, release] = await cheatingInMemoryStorage[topicId].lock;
+        [, release] = await topicStorageProxy.lock;
     } catch (e) {
         logger.error('Zip was requested before any PDFs were!', e);
         return await postBackErrorOrResultToBackend(topicId);
     }
 
     try {
-        if (_.isEmpty(cheatingInMemoryStorage[topicId].pdfPromises)) {
+        if (_.isEmpty(topicStorageProxy.pdfPromises)) {
             throw new Error('Zip was requested before any PDFs were!');
         }
 
         // Wait for all previous PDF generations for this topic to finish.
-        await Promise.allSettled(cheatingInMemoryStorage[topicId].pdfPromises);
+        await Promise.allSettled(topicStorageProxy.pdfPromises);
     } catch (e) {
         logger.error(`[${topicId}] An error occured waiting for PDF promises to settle.`, e);
         return await postBackErrorOrResultToBackend(topicId);
     }
 
     try {
-        await finalizeZip(cheatingInMemoryStorage[topicId].zipObject, {profUUID, topicId, addSolutionToFilename}, cheatingInMemoryStorage[topicId].pdfPromises);
+        await finalizeZip(topicStorageProxy.zipObject, {profUUID, topicId, addSolutionToFilename}, topicStorageProxy.pdfPromises);
     } catch (zipError) {
         logger.error('Failed to zip from PDFs', zipError);
         try {
@@ -143,18 +160,45 @@ router.get('/', async (_req, _res, next) => {
             logger.debug(`${topicId} has finished, releasing lock.`);
             release();
         } catch (e) {
-            logger.error(`WTF: The lock for ${topicId} disappeared from under us. ${cheatingInMemoryStorage[topicId]}`, e);
+            logger.error(`WTF: The lock for ${topicId} disappeared from under us. ${topicStorageProxy}`, e);
         }
         delete cheatingInMemoryStorage[topicId];
     }
 });
 
 const promiseStatusCount = (promises: PromiseWithStatus<unknown>[], status: 'resolved' | 'rejected' | 'pending') => promises.reduce((currentSum, promise) => currentSum + Number(promise.status === status), 0);
+router.get('/dumpAll', async (req, _res, next) => {
+    const res: any = _.transform(cheatingInMemoryStorage, (accum, obj, topicId) => {
+        if (_.isNil(obj)) {
+            logger.warn(`Topic ${topicId} is in the memory store, but is nil.`);
+            return accum.push({
+                topicId: topicId,
+                error: 'Uninitialized in memory.'
+            });
+        }
+        const resolvedCount = promiseStatusCount(obj.pdfPromises, 'resolved');
+        const rejectedCount = promiseStatusCount(obj.pdfPromises, 'rejected');
+        const pendingCount = promiseStatusCount(obj.pdfPromises, 'pending');
+        const pdfCount = obj.pdfPromises.length;
+
+        return accum.push({
+            topicId,
+            resolvedCount,
+            rejectedCount,
+            pendingCount,
+            pdfCount
+        });
+    }, <any[]>[]);
+    console.log(res);
+    logger.debug(res);
+    next(httpResponse.Ok('Fetched successfully', res));
+});
+
 router.get('/:topicId', async (req, _res, next) => {
     const topicId = parseInt(req.params.topicId, 10);
     const obj = cheatingInMemoryStorage[topicId];
-    if (!obj) {
-        next(httpResponse.Ok('Fetched successfully', null));
+    if (obj === undefined) {
+        return next(httpResponse.Ok('Fetched successfully', null));
     }
     const resolvedCount = promiseStatusCount(obj.pdfPromises, 'resolved');
     const rejectedCount = promiseStatusCount(obj.pdfPromises, 'rejected');

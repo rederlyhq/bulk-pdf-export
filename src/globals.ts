@@ -30,10 +30,11 @@ export interface PromiseWithStatus<T> extends Promise<T> {
 export const cheatingInMemoryStorage: {
     [topicId: number]: {
         pdfPromises: PromiseWithStatus<string>[];
+        professorUUID: string;
         pendingPriorities: PDFPriorityData[];
         zipObject: ZipObject;
-        lock: Promise<[number, SemaphoreInterface.Releaser]>
-    }
+        lock: Promise<[number, SemaphoreInterface.Releaser]> | undefined
+    } | undefined;
 } = {}
 
 // This limits how many Topics can be processed simultaneously.
