@@ -27,3 +27,14 @@ export interface DebugPageInfo {
         metrics: number;
     }
 }
+
+export type DumpAllInfo = {
+    topicId: number | string;
+    error: string;
+} | {
+    topicId: number | string;
+    resolvedCount: number;
+    rejectedCount: number;
+    pendingCount: number;
+    pdfCount: number;
+}

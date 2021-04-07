@@ -7,7 +7,7 @@ import { _Object } from '@aws-sdk/client-s3';
 import { addPDFToZip, createPDFFromSrcdoc, createZip, finalizeZip, postBackErrorOrResultToBackend } from './logic';
 import configurations from '../configurations';
 import { cheatingInMemoryStorage, globalTopicSemaphore, PDFPriorityData, PromiseWithStatus } from '../globals';
-import { DebugPageInfo, MakePDFRequestOptions } from './interfaces';
+import { DebugPageInfo, DumpAllInfo, MakePDFRequestOptions } from './interfaces';
 import PuppetMaster from '../puppetmaster';
 import Boom from 'boom';
 import utilities from './utility-route';
@@ -34,22 +34,20 @@ router.post('/', async (req, _res, next) => {
     // Respond immediately. The work is done asynchronously below.
     next(httpResponse.Ok('Working on it!'));
     
-    if (cheatingInMemoryStorage[topic] === undefined) {
-        cheatingInMemoryStorage[topic] = {
-            pdfPromises: <Array<PromiseWithStatus<string>>>[],
-            zipObject: createZip(topic, body.professorUUID, addSolutionToFilename),
-            professorUUID: body.professorUUID,
-            pendingPriorities: <Array<PDFPriorityData>>[],
-            lock: undefined,
-        };
-    }
-
-    const topicStorageProxy = cheatingInMemoryStorage[topic];
+    const topicStorageProxy = cheatingInMemoryStorage[topic] ?? {
+        pdfPromises: [],
+        zipObject: createZip(topic, body.professorUUID, addSolutionToFilename),
+        professorUUID: body.professorUUID,
+        pendingPriorities: [],
+        lock: undefined,
+    };
 
     if (topicStorageProxy === undefined) {
         logger.error('TSNH Topic Storage is not defined after just being defined.');
         return;
     }
+    
+    cheatingInMemoryStorage[topic] = topicStorageProxy;
 
     // If the topic doesn't have a lock yet, acquire one! Then, wait for that lock before processing.
     if (_.isNil(topicStorageProxy.lock)) {
@@ -116,7 +114,7 @@ router.get('/', async (_req, _res, next) => {
     const topicStorageProxy = cheatingInMemoryStorage[topicId];
 
     if (topicStorageProxy === undefined) {
-        logger.error('TSNH Topic Storage is not defined when zip requested.');
+        logger.error('Topic Storage is not defined when zip requested.');
         return await postBackErrorOrResultToBackend(topicId);
     }
 
@@ -169,7 +167,7 @@ router.get('/', async (_req, _res, next) => {
 
 const promiseStatusCount = (promises: PromiseWithStatus<unknown>[], status: 'resolved' | 'rejected' | 'pending') => promises.reduce((currentSum, promise) => currentSum + Number(promise.status === status), 0);
 router.get('/dumpAll', async (req, _res, next) => {
-    const res: any = _.transform(cheatingInMemoryStorage, (accum, obj, topicId) => {
+    const res = _.transform(cheatingInMemoryStorage, (accum, obj, topicId) => {
         if (_.isNil(obj)) {
             logger.warn(`Topic ${topicId} is in the memory store, but is nil.`);
             return accum.push({
@@ -189,15 +187,13 @@ router.get('/dumpAll', async (req, _res, next) => {
             pendingCount,
             pdfCount
         });
-    }, <any[]>[]);
+    }, <DumpAllInfo[]>[]);
 
     const metadata = {
         pages: <DebugPageInfo>[],
 
     };
     metadata.pages = await PuppetMaster.getPagesArray();
-    console.log(res);
-    logger.debug(res);
     next(httpResponse.Ok('Fetched successfully', {data: res, metadata}));
 });
 
