@@ -41,11 +41,6 @@ router.post('/', async (req, _res, next) => {
         pendingPriorities: [],
         lock: undefined,
     };
-
-    if (topicStorageProxy === undefined) {
-        logger.error('TSNH Topic Storage is not defined after just being defined.');
-        return;
-    }
     
     cheatingInMemoryStorage[topic] = topicStorageProxy;
 
