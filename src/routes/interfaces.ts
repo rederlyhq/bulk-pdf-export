@@ -20,3 +20,21 @@ export interface GetExportArchiveOptions {
     topicId: number;
     addSolutionToFilename: boolean;
 }
+
+export interface DebugPageInfo {
+    [index: number]: {
+        url: string;
+        metrics: number;
+    }
+}
+
+export type DumpAllInfo = {
+    topicId: number | string;
+    error: string;
+} | {
+    topicId: number | string;
+    resolvedCount: number;
+    rejectedCount: number;
+    pendingCount: number;
+    pdfCount: number;
+}

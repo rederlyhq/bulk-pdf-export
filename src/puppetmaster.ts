@@ -7,6 +7,7 @@ import { performance } from 'perf_hooks';
 import path = require('path');
 import { PDFPriorityData, cheatingInMemoryStorage, globalHeapManager } from './globals';
 import urljoin from 'url-join';
+import { DebugPageInfo } from './routes/interfaces';
 
 /**
  * An important part of the PDF generation is waiting for the HTML page to finish loading all content.
@@ -46,9 +47,16 @@ export default class PuppetMaster {
         } finally {
             logger.debug(`[${priority.topicId}] Removing self [${priority.prio}] from priorities. ${priority.firstName}`);
 
-            _.pull(cheatingInMemoryStorage[priority.topicId].pendingPriorities, priority);
+            const topicStorageProxy = cheatingInMemoryStorage[priority.topicId];
 
-            const nextPendingPromise = cheatingInMemoryStorage[priority.topicId].pendingPriorities.first;
+            if (topicStorageProxy === undefined) {
+                logger.error('TSNH Topic Storage is not defined while a PDF is printing.');
+                throw new Error('Topic Storage is not defined while a PDF is printing.');
+            }
+
+            _.pull(topicStorageProxy.pendingPriorities, priority);
+
+            const nextPendingPromise = topicStorageProxy.pendingPriorities.first;
             
             if (!_.isNil(nextPendingPromise) && priority.prio > 0) {
                 logger.debug(`[${priority.topicId}] Updating a priority from ${nextPendingPromise.prio} to ${priority.prio - 1} for ${nextPendingPromise.firstName}.`);
@@ -170,5 +178,21 @@ export default class PuppetMaster {
 
         logger.debug('Returning the PDF');
         return pdf;
+    }
+
+    // This is a debug method.
+    static getPagesArray = async (): Promise<DebugPageInfo> => {
+        const browser = await PuppetMaster.browser;
+        if (!browser) {
+            logger.error('Browser crashed!');
+            return [];
+        }
+
+        return Promise.all(
+            (await browser.pages()).map(async (page) => ({
+                url: page.url(), 
+                metrics: (await page.metrics()).TaskDuration
+            }))
+        );
     }
 }
