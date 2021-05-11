@@ -1,7 +1,7 @@
 mixin HeicImg(url, id)
     img.fullpageImg(id=id alt=id class='heic' src=`${url}`)
     script.
-        (()=>{
+        (async ()=>{
             var url = "#{url}";
             var name = "#{id}";
             console.log('HEIC: Checking', name);
@@ -11,27 +11,29 @@ mixin HeicImg(url, id)
             
             var heic = document.getElementById("#{id}");
 
-            fetch(url)
-                .then((res) => res.blob())
-                .then((blob) => window.sequentialHeic2any(blob))
-                .then((conversionResult) => {
-                    console.log('HEIC: Success!');
-                    var heicUrl = URL.createObjectURL(conversionResult);
-                    heic.onload = () => {
-                        // TODO downgrade to log
-                        console.log('HEIC: LOAD EVENT SUCCESS');
-                        heic.dispatchEvent(new Event('heicDone'));
-                    }
-                    heic.onerror = (e) => {
-                        console.error(`HEIC: Failed to load ${heic.src}`);
-                        heic.dispatchEvent(new Event('heicDone'));
-                    }
-                    heic.src = heicUrl;
-                })
-                .catch((e) => {
-                    console.error('HEIC: Failed to fetch', e);
+            try {
+                const res = await fetch(url);
+                if (res.headers.get('content-type')) {
+                    return heic.src = url;
+                }
+                const blob = await res.blob();
+                const conversionResult = window.sequentialHeic2any(blob)
+                console.log('HEIC: Success!');
+                const heicUrl = URL.createObjectURL(conversionResult);
+                heic.onload = () => {
+                    // TODO downgrade to log
+                    console.log('HEIC: LOAD EVENT SUCCESS');
                     heic.dispatchEvent(new Event('heicDone'));
-                });
+                }
+                heic.onerror = (e) => {
+                    console.error(`HEIC: Failed to load ${heic.src}`);
+                    heic.dispatchEvent(new Event('heicDone'));
+                }
+                heic.src = heicUrl;
+            } catch (e) {
+                console.error('HEIC: Failed to fetch', e);
+                heic.dispatchEvent(new Event('heicDone'));
+            }
         })();
 
 mixin PdfSetupMixin
