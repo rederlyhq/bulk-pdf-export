@@ -13,10 +13,12 @@ mixin HeicImg(url, id)
 
             try {
                 const res = await fetch(url);
-
+                
+                // In Rederly architecture, HEIC files can be converted to JPEG files.
                 if (res.headers.get('content-type') === 'image/jpeg') {
                     return heic.src = url;
                 }
+
                 const blob = await res.blob();
                 const conversionResult = await window.sequentialHeic2any(blob)
                 console.log('HEIC: Success!');
