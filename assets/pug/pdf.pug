@@ -13,11 +13,12 @@ mixin HeicImg(url, id)
 
             try {
                 const res = await fetch(url);
-                if (res.headers.get('content-type')) {
+
+                if (res.headers.get('content-type') === 'image/jpeg') {
                     return heic.src = url;
                 }
                 const blob = await res.blob();
-                const conversionResult = window.sequentialHeic2any(blob)
+                const conversionResult = await window.sequentialHeic2any(blob)
                 console.log('HEIC: Success!');
                 const heicUrl = URL.createObjectURL(conversionResult);
                 heic.onload = () => {
