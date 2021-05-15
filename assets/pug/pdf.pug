@@ -130,6 +130,31 @@ body(width="210mm" height="297mm")
     include templates/rederly-logo.pug
     h1(style={'text-align': 'center'}) #{topicTitle}
     h2(style={'text-align': 'center'}) #{firstName} #{lastName}
+    if earliestStartTime && lastSubmissionTime
+        h3(style={'text-align': 'center'}) #{earliestStartTime.toLocaleString('en-US', { timeZone: 'America/New_York'})} ET - #{lastSubmissionTime.toLocaleString('en-US', { timeZone: 'America/New_York'})} ET
+        h3(style={'text-align': 'center'}) Duration: #{(lastSubmissionTime - earliestStartTime) / 60000} minutes
+    table(style={'margin-left': 'auto', 'margin-right': 'auto', 'border': '1px solid black'})
+        thead 
+            tr 
+                th Problem Number
+                th Effective Score
+                th System Score
+                th Weight
+                th Effective Weighted Score
+        tbody 
+            each problem, problemIndex in problems
+                tr 
+                    td #{problem.number}
+                    td #{problem.effectiveScore}
+                    td #{problem.legalScore}
+                    td #{problem.weight}
+                    td #{problem.effectiveWeightedScore.toFixed(2)}
+            tr 
+                td
+                td
+                td
+                td
+                td #{totalWeightedScore.toFixed(2)} / #{totalWeight.toFixed(2)} (#{totalWeightedPercentage.toPercentString()})
     each problem, problemIndex in problems
         if problem.srcdoc
             h3(style={'break-before': 'page', 'break-after': 'avoid'}) Problem #{problem.number}
@@ -138,10 +163,9 @@ body(width="210mm" height="297mm")
             div Effective Score: #{problem.effectiveScore}
         if problem.legalScore
             div Original System Score: #{problem.legalScore}
+        if problem.weight 
+            div Weight: #{problem.weight}
 
-        if problem.startTime
-            div Started Time: #{problem.startTime.toLocaleString('en-US', { timeZone: 'America/New_York'})} ET 
-                i(style={'font-size': '8px'}) (#{problem.startTime.toString()})
         if problem.submissionTime
             div Submission Time: #{problem.submissionTime.toLocaleString('en-US', { timeZone: 'America/New_York'})} ET 
                 i(style={'font-size': '8px'}) (#{problem.submissionTime.toString()})

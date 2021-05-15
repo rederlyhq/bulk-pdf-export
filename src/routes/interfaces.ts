@@ -14,6 +14,7 @@ export interface MakePDFRequestOptions {
         legalScore?: number;
         startTime?: Date;
         submissionTime?: Date;
+        weight: number;
     }[];
 };
 
