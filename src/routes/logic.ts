@@ -29,6 +29,8 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSoluti
             ...prob,
             effectiveScore: prob.effectiveScore?.toPercentString(),
             legalScore: prob.legalScore?.toPercentString(),
+            startTime: prob.startTime ? new Date(prob.startTime) : undefined,
+            submissionTime: prob.submissionTime ? new Date(prob.submissionTime) : undefined,
         })).value();
 
         await mkdirp(path.dirname(htmlFilepath));

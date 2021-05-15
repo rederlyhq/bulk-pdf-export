@@ -139,6 +139,13 @@ body(width="210mm" height="297mm")
         if problem.legalScore
             div Original System Score: #{problem.legalScore}
 
+        if problem.startTime
+            div Started Time: #{problem.startTime.toLocaleString('en-US', { timeZone: 'America/New_York'})} ET 
+                i(style={'font-size': '8px'}) (#{problem.startTime.toString()})
+        if problem.submissionTime
+            div Submission Time: #{problem.submissionTime.toLocaleString('en-US', { timeZone: 'America/New_York'})} ET 
+                i(style={'font-size': '8px'}) (#{problem.submissionTime.toString()})
+
         if problem.srcdoc
             iframe(srcdoc=`${problem.srcdoc.trim()}` width='100%' id=`prob${problem.number}`)
             script.
