@@ -12,6 +12,8 @@ export interface MakePDFRequestOptions {
         attachments: {url: string; name: string; time: Date}[];
         effectiveScore?: number;
         legalScore?: number;
+        startTime?: Date;
+        submissionTime?: Date;
     }[];
 };
 
