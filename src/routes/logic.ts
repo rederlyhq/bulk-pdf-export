@@ -25,17 +25,35 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSoluti
         // Filename is required for caching to work. You must turn this off in development or restart your dev server.
         const f = pug.compileFile('assets/pug/pdf.pug', { filename: 'topic_student_export', cache: true, debug: false});
 
-        const prettyProblems = _(problems).sortBy(['number']).map(prob => ({
-            ...prob,
-            effectiveScore: prob.effectiveScore?.toPercentString(),
-            legalScore: prob.legalScore?.toPercentString(),
-            startTime: prob.startTime ? new Date(prob.startTime) : undefined,
-            submissionTime: prob.submissionTime ? new Date(prob.submissionTime) : undefined,
-        })).value();
+        const prettyProblems = _(problems).sortBy(['number']).map(prob => {
+            return {
+                ...prob,
+                weight: prob.weight,
+                effectiveScore: prob.effectiveScore?.toPercentString(),
+                effectiveWeightedScore: (prob.effectiveScore ?? 0) * prob.weight,
+                legalScore: prob.legalScore?.toPercentString(),
+                startTime: prob.startTime ? new Date(prob.startTime) : undefined,
+                submissionTime: prob.submissionTime ? new Date(prob.submissionTime) : undefined,
+            }
+        }).value();
+
+        const totalWeightedScoreTuple = _.reduce(prettyProblems, (aggr, prob) => {
+            const numerator = aggr[0] + prob.effectiveWeightedScore;
+            const denominator = aggr[1] + prob.weight;
+            return [numerator, denominator]
+        }, [0, 0]);
 
         await mkdirp(path.dirname(htmlFilepath));
         await writeFile(htmlFilepath, f({
-            firstName, lastName, topicTitle: name, problems: prettyProblems
+            firstName, 
+            lastName, 
+            topicTitle: name, 
+            problems: prettyProblems,
+            earliestStartTime: _.minBy(prettyProblems, 'startTime')?.startTime,
+            lastSubmissionTime: _.maxBy(prettyProblems, 'submissionTime')?.submissionTime,
+            totalWeightedScore: totalWeightedScoreTuple[0],
+            totalWeight: totalWeightedScoreTuple[1],
+            totalWeightedPercentage: totalWeightedScoreTuple[1] === 0 ? 1 : (totalWeightedScoreTuple[0] / totalWeightedScoreTuple[1])
         }), 'utf8');
 
         logger.debug(`Wrote '${htmlFilepath}'`);
