@@ -134,6 +134,7 @@ head
         td, th { 
             border-left: 2px solid black; 
             border-right: 2px solid black;
+            padding: 6px;
         }
 
         thead {
@@ -154,7 +155,7 @@ body(width="210mm" height="297mm")
     h2(style={'text-align': 'center'}) #{firstName} #{lastName}
     if earliestStartTime && lastSubmissionTime
         h3(style={'text-align': 'center'}) #{earliestStartTime.toLocaleString('en-US', { timeZone: 'America/New_York'})} ET - #{lastSubmissionTime.toLocaleString('en-US', { timeZone: 'America/New_York'})} ET
-        h3(style={'text-align': 'center'}) Duration: #{(lastSubmissionTime - earliestStartTime) / 60000} minutes
+        h3(style={'text-align': 'center'}) Duration: #{Math.floor((lastSubmissionTime - earliestStartTime) / 60000)} minutes
     table(style={'margin-left': 'auto', 'margin-right': 'auto', 'border': '1px solid black'})
         thead 
             tr 
