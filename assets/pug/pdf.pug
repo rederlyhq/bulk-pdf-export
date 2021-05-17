@@ -166,7 +166,8 @@ body(width="210mm" height="297mm")
         tbody 
             each problem, problemIndex in problems
                 tr 
-                    td #{problem.number}
+                    td 
+                        a(href=`#probHeader${problem.number}`) #{problem.number}
                     td #{problem.effectiveScore}
                     td #{problem.legalScore}
                     td #{problem.weight}
@@ -176,8 +177,8 @@ body(width="210mm" height="297mm")
                 th Total
                 td #{totalWeightedScore.toFixed(2)} / #{totalWeight.toFixed(2)} (#{totalWeightedPercentage.toPercentString()})
     each problem, problemIndex in problems
-        if problem.srcdoc
-            h3(style={'break-before': 'page', 'break-after': 'avoid'}) Problem #{problem.number}
+        if problem.number
+            h3(style={'break-before': 'page', 'break-after': 'avoid'} id=`probHeader${problem.number}`) Problem #{problem.number}
 
         if problem.effectiveScore
             div Effective Score: #{problem.effectiveScore}
