@@ -172,7 +172,7 @@ body(width="210mm" height="297mm")
                     td 
                         a(href=`#probHeader${problem.number}`) #{problem.number}
                     td #{problem.effectiveScore}
-                    td #{problem.legalScore}
+                    td #{problem.partialCreditBestScore}
                     td #{problem.weight}
                     td #{problem.effectiveWeightedScore.toFixed(2)}
             tr 
@@ -185,8 +185,8 @@ body(width="210mm" height="297mm")
 
         if problem.effectiveScore
             div Effective Score: #{problem.effectiveScore}
-        if problem.legalScore
-            div Original System Score: #{problem.legalScore}
+        if problem.partialCreditBestScore
+            div Original System Score: #{problem.partialCreditBestScore}
         if problem.weight 
             div Weight: #{problem.weight}
 
