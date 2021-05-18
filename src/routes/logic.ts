@@ -31,7 +31,7 @@ export const createPDFFromSrcdoc = async (body: MakePDFRequestOptions, addSoluti
                 weight: prob.weight,
                 effectiveScore: prob.effectiveScore?.toPercentString(),
                 effectiveWeightedScore: (prob.effectiveScore ?? 0) * prob.weight,
-                legalScore: prob.legalScore?.toPercentString(),
+                partialCreditBestScore: prob.partialCreditBestScore?.toPercentString(),
                 startTime: prob.startTime ? new Date(prob.startTime) : undefined,
                 submissionTime: prob.submissionTime ? new Date(prob.submissionTime) : undefined,
             }

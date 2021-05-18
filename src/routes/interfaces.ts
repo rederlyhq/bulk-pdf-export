@@ -11,7 +11,7 @@ export interface MakePDFRequestOptions {
         srcdoc: string;
         attachments: {url: string; name: string; time: Date}[];
         effectiveScore?: number;
-        legalScore?: number;
+        partialCreditBestScore?: number;
         startTime?: Date;
         submissionTime?: Date;
         weight: number;
