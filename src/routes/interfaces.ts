@@ -27,7 +27,7 @@ export interface GetExportArchiveOptions {
 export interface DebugPageInfo {
     [index: number]: {
         url: string;
-        metrics: number;
+        metrics: number | undefined;
     }
 }
 
