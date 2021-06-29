@@ -9,6 +9,8 @@ RUN npm install --silent
 
 # Seems like this would be a problem if you already locally had node modules
 COPY . ./
+# Make sure env file exists for copy
+RUN touch /app/.env
 
 ARG REDERLY_PACKAGER_PRUNE_DEPENDENCIES=true
 
