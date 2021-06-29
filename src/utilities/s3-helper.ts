@@ -1,4 +1,4 @@
-import {S3Client, PutObjectCommand, S3, _Object} from '@aws-sdk/client-s3';
+import {S3Client, PutObjectCommand, S3, _Object, S3ClientConfig} from '@aws-sdk/client-s3';
 import stream = require('stream');
 import configurations from '../configurations';
 import logger from './logger';
@@ -7,12 +7,13 @@ import { createReadStream } from 'fs';
 import { performance } from 'perf_hooks';
 
 export default class S3Helper {
-    static awsConfigurationObject = {
+    static awsConfigurationObject: S3ClientConfig = {
         region: configurations.aws.awsRegion,
         credentials: {
             accessKeyId: configurations.aws.awsAccessKeyId,
             secretAccessKey: configurations.aws.awsSecretKey,
-        }
+        },
+        endpoint: configurations.aws.s3endpoint ?? undefined
     }
     static s3 = new S3({ ...S3Helper.awsConfigurationObject })
 

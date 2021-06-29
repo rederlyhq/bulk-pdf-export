@@ -150,6 +150,7 @@ const configurations = {
         awsAccessKeyId: readStringValue('AWS_ACCESS_KEY', ''),
         awsSecretKey: readStringValue('AWS_SECRET_KEY', ''),
         awsRegion: readStringValue('AWS_REGION', 'us-east-2'),
+        s3endpoint: readStringValue('AWS_S3_ENDPOINT', undefined),
     },
     backend: {
         url: readStringValue('BACKEND_URL', rederlyURL),
